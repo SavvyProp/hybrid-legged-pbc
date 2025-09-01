@@ -227,7 +227,7 @@ def reward_pbc_w_leg_only(w, contact):
    return lse
 
 def reward_action_rate(action, prev_action):
-   rew = jnp.sum(jnp.square(action - prev_action))
+   rew = jnp.sum(jnp.square(jnp.tanh(action) - jnp.tanh(prev_action)))
    return rew
 
 def reward_jnt_acc(qacc):

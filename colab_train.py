@@ -21,7 +21,7 @@ def make_trainfn():
     )
 
     train_fn = functools.partial(
-            train, num_timesteps=200000000, num_evals=15, episode_length=1000,
+            train, num_timesteps=2000000, num_evals=15, episode_length=1000,
             normalize_observations=False, unroll_length=20, num_minibatches = 32,
             num_updates_per_batch = 4, discounting = 0.99, learning_rate = 3e-4,
             entropy_cost=0.004, num_envs=4096, batch_size=256, clipping_epsilon=0.2,
