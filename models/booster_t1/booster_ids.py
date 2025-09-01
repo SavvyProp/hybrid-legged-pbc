@@ -110,6 +110,18 @@ default_qpos = jnp.array(model.keyframe('home').qpos)[joint_pos_ids]
 
 max_vel = jnp.ones([23]) * 10.0
 
+base_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, 'Trunk')
+
+floor_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "floor")
+right_geom_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "right_foot_col")
+left_geom_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "left_foot_col")
+
+col_dict = {
+    "floor": floor_id,
+    "right_foot": right_geom_id,
+    "left_foot": left_geom_id
+}
+
 ids = {
     "joint_pos_ids": joint_pos_ids,
     "joint_vel_ids": joint_vel_ids,
@@ -120,5 +132,7 @@ ids = {
     "eef_num": eef_num,
     "ctrl_num": len(joint_names),
     "default_qpos": default_qpos,
-    "max_vel": max_vel
+    "max_vel": max_vel,
+    "base_id": base_id,
+    "col": col_dict
 }

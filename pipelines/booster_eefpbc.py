@@ -149,7 +149,7 @@ def multistep(model, pipeline_state, n_frames, action, ids = bids):
 
 	return jax.lax.scan(f, pipeline_state, (), n_frames)[0]
 
-class DigitPipelineEnv(PipelineEnv):
+class PBCPipelineEnv(PipelineEnv):
 	def __init__(self, 
 					sys: base.System,
 					n_frames: int = 1,):
@@ -169,4 +169,4 @@ class DigitPipelineEnv(PipelineEnv):
 			  
 	def pipeline_step(self, pipeline_state: Any, action: jax.Array) -> base.State:
 		"""Takes a physics step using the physics pipeline."""
-		return multistep(self.sys, pipeline_state, 2, action)
+		return multistep(self.sys, pipeline_state, 5, action)

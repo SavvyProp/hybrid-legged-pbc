@@ -1,7 +1,6 @@
 <mujoco model="T1">
   <compiler angle="radian" meshdir="assets" autolimits="true"/>
-
-  <option integrator="implicitfast"/>
+  <option integrator="implicitfast" timestep='0.002'/>
 
   <asset>
     <material name="light_gray" rgba="0.76 0.76 0.76 1"/>
@@ -161,7 +160,7 @@
                       diaginertia="0.00269786 0.002385 0.00218714"/>
                     <joint name="Left_Ankle_Roll" axis="1 0 0" range="-0.44 0.44" actuatorfrcrange="-15 15"/>
                     <geom class="visual" mesh="left_foot_link"/>
-                    <geom class="collision" size="0.1115 0.05 0.015" pos="0.01 0 -0.015" type="box"/>
+                    <geom name="left_foot_col" class="collision" size="0.1115 0.05 0.015" pos="0.01 0 -0.015" type="box"/>
                     <site name="left_foot"/>
                   </body>
                 </body>
@@ -201,7 +200,7 @@
                       diaginertia="0.00269786 0.002385 0.00218714"/>
                     <joint name="Right_Ankle_Roll" axis="1 0 0" range="-0.44 0.44" actuatorfrcrange="-15 15"/>
                     <geom class="visual" mesh="right_foot_link"/>
-                    <geom class="collision" size="0.1115 0.05 0.015" pos="0.01 0 -0.015" type="box"/>
+                    <geom name="right_foot_col" class="collision" size="0.1115 0.05 0.015" pos="0.01 0 -0.015" type="box"/>
                     <site name="right_foot"/>
                   </body>
                 </body>
@@ -217,6 +216,7 @@
     <gyro name="angular-velocity" site="imu"/>
     <accelerometer name="linear-acceleration" site="imu"/>
     <framequat name="orientation" objtype="site" objname="imu"/>
+    <velocimeter site="imu" name="linear-velocity" />
   </sensor>
 
   <actuator>
