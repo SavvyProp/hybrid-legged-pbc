@@ -8,12 +8,12 @@ from brax.training.agents.ppo import networks as ppo_networks
 import networks.mlp as mlp
 from brax.io import model
 from matplotlib import pyplot as plt
-from envs.booster_flatwalk_pbc import FlatwalkPBCEnv, metrics_dict
+from envs.booster_flatwalk_pd import FlatwalkEnv, metrics_dict
 
 def make_trainfn():
-    envs.register_environment('FlatwalkPBCEnv', FlatwalkPBCEnv)
-    env = envs.get_environment('FlatwalkPBCEnv')
-    eval_env = envs.get_environment('FlatwalkPBCEnv')    
+    envs.register_environment('FlatwalkEnv', FlatwalkEnv)
+    env = envs.get_environment('FlatwalkEnv')
+    eval_env = envs.get_environment('FlatwalkEnv')    
     make_networks_factory = functools.partial(
         mlp.make_ppo_networks, 
         #ppo_networks.make_ppo_networks,
@@ -21,10 +21,10 @@ def make_trainfn():
     )
 
     train_fn = functools.partial(
-            train, num_timesteps=300000000, num_evals=15, episode_length=1000,
+            train, num_timesteps=200000000, num_evals=15, episode_length=1000,
             normalize_observations=False, unroll_length=20, num_minibatches = 32,
             num_updates_per_batch = 4, discounting = 0.99, learning_rate = 3e-4,
-            entropy_cost=0.004, num_envs=8192, batch_size=1024, clipping_epsilon=0.2,
+            entropy_cost=0.004, num_envs=4096, batch_size=256, clipping_epsilon=0.2,
             num_resets_per_eval=1, action_repeat=1, max_grad_norm=1.0,
             reward_scaling=1.0,
             num_eval_envs = 256,

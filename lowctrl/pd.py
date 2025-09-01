@@ -10,3 +10,21 @@ def logit2limit(logit, ids):
 def logit2vel(logit):
     max_vel = 10.0
     return jnp.tanh(logit) * max_vel
+
+def step(mjx_model, state, act, ids):
+    nn_p_logit = act[:ids["ctrl_num"]]
+    nn_d_logit = act[ids["ctrl_num"]:2*ids["ctrl_num"]]
+    des_pos = logit2limit(nn_p_logit, ids)
+    des_vel = logit2vel(nn_d_logit)
+
+    kp = jnp.array(ids["p_gains"])
+    kd = jnp.array(ids["d_gains"])
+
+    qc = state.qpos[ids["joint_pos_ids"]][7:]
+    qd = state.qvel[ids["joint_vel_ids"]][6:]
+
+    u_nn_p = (des_pos - qc) * kp
+    u_nn_d = (des_vel - qd) * kd
+
+    u = u_nn_p + u_nn_d
+    return u, state

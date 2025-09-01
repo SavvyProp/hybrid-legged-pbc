@@ -6,7 +6,7 @@ from agents.ppo import train
 import networks.mlp as mlp
 from brax.io import model
 from matplotlib import pyplot as plt
-from envs.booster_flatwalk_pbc import FlatwalkPBCEnv, metrics_dict
+from envs.booster_flatwalk_pd import FlatwalkEnv, metrics_dict
 import os
 
 # ensure 'training' directory exists
@@ -20,9 +20,9 @@ if not os.path.exists(training_dir + "/" + run_dir):
 
 save_dir = os.path.join(training_dir, run_dir)
 
-envs.register_environment('flatwalkpbc', FlatwalkPBCEnv)
-env = envs.get_environment('flatwalkpbc')
-eval_env = envs.get_environment('flatwalkpbc')
+envs.register_environment('FlatwalkEnv', FlatwalkEnv)
+env = envs.get_environment('FlatwalkEnv')
+eval_env = envs.get_environment('FlatwalkEnv')
 
 make_networks_factory = functools.partial(
     mlp.make_ppo_networks,

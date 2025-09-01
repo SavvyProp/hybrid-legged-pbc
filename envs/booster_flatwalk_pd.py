@@ -1,4 +1,4 @@
-from pipelines.booster_eefpbc import PBCPipelineEnv
+from pipelines.booster_pd import PDPipelineEnv
 from brax.envs import State
 import jax.numpy as jnp
 import mujoco
@@ -30,7 +30,6 @@ weight_dict = {
     "feet_height_track": 0.5,
     "feet_clearance": 0.5,
     "action_rate": -0.001,
-    "pbc_w": -1.0
 }
 
 metrics_dict = {
@@ -40,7 +39,7 @@ metrics_dict = {
 for metric in weight_dict.keys():
     metrics_dict[metric] = 0.0
 
-class FlatwalkEnv(PBCPipelineEnv):
+class FlatwalkEnv(PDPipelineEnv):
     def __init__(self):
 
         self.model = mujoco.MjModel.from_xml_path(
@@ -77,7 +76,7 @@ class FlatwalkEnv(PBCPipelineEnv):
 
     @property
     def action_size(self):
-        return 2 * self.jnt_num + self.eef_num * 10 + 9
+        return 2 * self.jnt_num
 
     def get_sensor_data(self, data, tuple):
         return data.sensordata[tuple[0]: tuple[0] + tuple[1]]
@@ -370,9 +369,6 @@ class FlatwalkEnv(PBCPipelineEnv):
             data0.qvel[self.ids["joint_vel_ids"]][6:]
         ) * weight_dict["joint_vel"]
 
-        reward_dict["pbc_w"] = rewards.reward_pbc_w_leg_only(
-            w, contact
-        ) * weight_dict["pbc_w"]
 
         state.info["prev_action"] = act
         
