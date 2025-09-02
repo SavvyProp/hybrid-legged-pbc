@@ -29,7 +29,7 @@ weight_dict = {
     "feet_contact": 2.0,
     "feet_height_track": 0.5,
     "feet_clearance": 0.5,
-    "action_rate": -0.001,
+    "action_rate": -0.01,
 }
 
 metrics_dict = {
@@ -281,8 +281,10 @@ class FlatwalkEnv(PDPipelineEnv):
             left_frc[None, :], right_frc[None, :]
         ], axis = 0)
 
-        target_vel = jnp.array([0.3, 0.0])
-        target_angvel = 0.0
+        #target_vel = jnp.array([0.3, 0.0])
+        #target_angvel = 0.0
+        target_vel = info["cmd"]["vel"]
+        target_angvel = info["cmd"]["angvel"][0]
 
         halt = info["halt_cmd"]
 
@@ -291,16 +293,16 @@ class FlatwalkEnv(PDPipelineEnv):
             self.ids,
             data0,
             target_vel,
-            halt,
-            0.5
+            0.5,
+            halt
         ) * weight_dict["lin_vel_xy"]
 
         reward_dict["angvel_z"] = rewards.reward_track_z_angvel(
             self.ids,
             data0,
             target_angvel,
-            halt,
-            0.5
+            0.5,
+            halt
         ) * weight_dict["angvel_z"]
 
         reward_dict["lin_vel_z_l2"] = rewards.reward_z_vel(

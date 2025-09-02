@@ -82,7 +82,7 @@ def reward_foot_clearance(ids, data,
    Reward for swing a certain desired constant clearence above ground
    """
    standing_height = 0.0 # Means that terrain is all 0
-   standing_position_toe_roll_z = 0.0155 #0.0626
+   standing_position_toe_roll_z = 0.0 #0.0626
    offset = standing_height + standing_position_toe_roll_z
 
    left_foot_pos = data.site_xpos[ids["eef"]["left_foot"]["site_id"]]
@@ -187,7 +187,7 @@ def reward_xyvel_local(ids, data, target_vel, std, halt):
 def reward_z_vel(ids, data):
    return jnp.square(data.xd.vel[ids["base_id"]][2])
 
-def reward_track_z_angvel(ids, data, target_angvel, halt, std):
+def reward_track_z_angvel(ids, data, target_angvel, std, halt):
    z_angvel = data.xd.ang[ids["base_id"]][2]
    angvel_err = jnp.square(z_angvel - target_angvel * (1 - halt))
    return jnp.exp(-angvel_err / (std**2))
