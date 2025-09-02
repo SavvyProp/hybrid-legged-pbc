@@ -26,8 +26,11 @@ def makeIFN():
     import functools
     import networks.mlp as mlp
     network_factory = functools.partial(
-        mlp.make_ppo_networks,
-        policy_hidden_layer_sizes=(1024, 512, 512, 256, 256)
+        ppo_networks.make_ppo_networks,
+        value_hidden_layer_sizes=(512, 256, 256, 128),
+        policy_hidden_layer_sizes=(1024, 512, 512, 256, 256),
+        distribution_type = "normal",
+        noise_std_type = "scalar"
     )
     # normalize = running_statistics.normalize
     normalize = lambda x, y: x
@@ -38,7 +41,7 @@ def makeIFN():
     make_inference_fn = ppo_networks.make_inference_fn(ppo_network)
     return make_inference_fn
 
-dir = "training/test_2"
+dir = "training/test_3"
 
 model_path = dir + "/walk_policy"
 saved_params = model.load_params(model_path)
@@ -61,7 +64,7 @@ nn_p_list = []
 states = []
 
 
-for c in range(50):
+for c in range(1000):
     act_rng, rng = jax.random.split(rng)
     obs_list += [state.obs]
     ctrl, _ = jit_inference_fn(state.obs, act_rng)
@@ -82,7 +85,7 @@ print("Rollout precomputed")
 viewer = mujoco.viewer.launch_passive(mj_model, data)
 import time
 while True:
-    for c1 in range(50):
+    for c1 in range(1000):
         print("=========================")
         #print(ctrl_list[c1])
         #print(nn_p_list[c1])
