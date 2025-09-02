@@ -17,6 +17,7 @@ def make_trainfn():
     make_networks_factory = functools.partial(
         #mlp.make_ppo_networks, 
         ppo_networks.make_ppo_networks,
+        value_hidden_layer_sizes=(512, 256, 256, 128),
         policy_hidden_layer_sizes=(1024, 512, 512, 256, 256),
         distribution_type = "normal",
         noise_std_type = "log"
@@ -25,8 +26,8 @@ def make_trainfn():
     train_fn = functools.partial(
             train, num_timesteps=200000000, num_evals=15, episode_length=1000,
             normalize_observations=False, unroll_length=20, num_minibatches = 32,
-            num_updates_per_batch = 8, discounting = 0.99, learning_rate = 3e-4,
-            entropy_cost=0.001, num_envs=8192, batch_size=1024, clipping_epsilon=0.2,
+            num_updates_per_batch = 4, discounting = 0.99, learning_rate = 3e-4,
+            entropy_cost=0.005, num_envs=8192, batch_size=256, clipping_epsilon=0.2,
             num_resets_per_eval=1, action_repeat=1, max_grad_norm=1.0,
             reward_scaling=1.0,
             num_eval_envs = 256,
