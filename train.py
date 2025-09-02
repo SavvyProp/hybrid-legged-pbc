@@ -8,6 +8,7 @@ from brax.io import model
 from matplotlib import pyplot as plt
 from envs.booster_flatwalk_pd import FlatwalkEnv, metrics_dict
 import os
+from brax.training.agents.ppo import networks as ppo_networks
 
 # ensure 'training' directory exists
 training_dir = "training"
@@ -25,8 +26,11 @@ env = envs.get_environment('FlatwalkEnv')
 eval_env = envs.get_environment('FlatwalkEnv')
 
 make_networks_factory = functools.partial(
-    mlp.make_ppo_networks,
-    policy_hidden_layer_sizes=(1024, 512, 512, 256, 128)
+        #mlp.make_ppo_networks, 
+        ppo_networks.make_ppo_networks,
+        policy_hidden_layer_sizes=(1024, 512, 512, 256, 256),
+        distribution_type = "normal",
+        noise_std_type = "log"
 )
 
 

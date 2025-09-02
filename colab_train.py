@@ -15,9 +15,11 @@ def make_trainfn():
     env = envs.get_environment('FlatwalkEnv')
     eval_env = envs.get_environment('FlatwalkEnv')    
     make_networks_factory = functools.partial(
-        mlp.make_ppo_networks, 
-        #ppo_networks.make_ppo_networks,
-        policy_hidden_layer_sizes=(1024, 512, 512, 256, 256)
+        #mlp.make_ppo_networks, 
+        ppo_networks.make_ppo_networks,
+        policy_hidden_layer_sizes=(1024, 512, 512, 256, 256),
+        distribution_type = "normal",
+        noise_std_type = "log"
     )
 
     train_fn = functools.partial(
