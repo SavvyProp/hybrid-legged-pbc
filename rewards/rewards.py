@@ -163,8 +163,8 @@ def reward_base_orien(data):
    return jnp.sum(jnp.square(grav_vec[0:2]))
 
 def height_termination(data, height_threshold):
-   is_healthy = jnp.where(data.q[2] < height_threshold[0], 0.0, 1.0)
-   is_healthy = jnp.where(data.q[2] > height_threshold[1], 0.0, is_healthy)
+   is_healthy = jnp.where(data.qpos[2] < height_threshold[0], 0.0, 1.0)
+   is_healthy = jnp.where(data.qpos[2] > height_threshold[1], 0.0, is_healthy)
    termination = 1 - is_healthy
    return is_healthy, termination
 

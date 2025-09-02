@@ -132,9 +132,9 @@ class FlatwalkEnv(PDPipelineEnv):
         rng, key3 = jax.random.split(rng)
 
         vel = jax.random.uniform(key1, shape=[2], minval = -1, maxval = 1)
-        vel = vel * jnp.array([0.4, 0.4])
+        vel = vel * jnp.array([0.3, 0.3])
         #vel = vel + jnp.array([0.2, 0.0])
-        angvel = jax.random.uniform(key2, shape=[1], minval=-0.7, maxval=0.7)
+        angvel = jax.random.uniform(key2, shape=[1], minval=-0.3, maxval=0.3)
         #phase_period = jax.random.uniform(key3, shape=[1], minval=0.6, maxval=0.7)
         phase_period = PHASE_DURATION * jnp.ones([1,])
         cmd = {"vel": vel, "angvel": angvel, "phase_period": phase_period}
@@ -314,7 +314,7 @@ class FlatwalkEnv(PDPipelineEnv):
         ) * weight_dict["angvel_xy_l2"]
 
         _, done = rewards.height_termination(
-            data0, (0.3, 0.9)
+            data0, (0.1, 1.2)
         )
 
         reward_dict["termination"] = done * weight_dict["termination"]
