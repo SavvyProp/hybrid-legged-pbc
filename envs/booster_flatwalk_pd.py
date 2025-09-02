@@ -19,17 +19,17 @@ weight_dict = {
     "angvel_xy_l2": -0.05,
     "termination": -200,
     "joint_torques": -1.0e-5, #-1.0e-5,
-    "joint_acc": -0.5e-7,
-    "joint_vel": -2e-4,
+    "joint_acc": -5e-9,
+    "joint_vel": -2e-5,
     "joint_limits": -1.0,
     "base_flat_orien": -2.,
-    "feet_slip": -1.0,
+    "feet_slip": -0.5,
     "feet_airtime": 0.25,
     "feet_force": -3e-3,
     "feet_contact": 2.0,
     "feet_height_track": 0.5,
     "feet_clearance": 0.5,
-    "action_rate": -0.01,
+    "action_rate": -0.0005,
 }
 
 metrics_dict = {
