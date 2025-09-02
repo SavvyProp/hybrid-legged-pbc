@@ -11,3 +11,7 @@ ctrl = default_act()
 
 
 print(des_pos)
+
+print(ids["p_gains"])
+print(ids["d_gains"])
+print(ids["jnt_limits"])

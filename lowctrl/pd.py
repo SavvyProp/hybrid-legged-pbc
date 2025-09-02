@@ -23,8 +23,8 @@ def step(mjx_model, state, act, ids):
     qc = state.qpos[ids["joint_pos_ids"]][7:]
     qd = state.qvel[ids["joint_vel_ids"]][6:]
 
-    u_nn_p = (des_pos - qc) * kp * 0.3
-    u_nn_d = (des_vel - qd) * kd * 0.3
+    u_nn_p = (des_pos - qc) * kp
+    u_nn_d = (des_vel - qd) * kd
 
     u = u_nn_p + u_nn_d
     return u, state

@@ -220,29 +220,29 @@
   </sensor>
 
   <actuator>
-    <motor class="t1" name="AAHead_yaw" joint="AAHead_yaw" ctrllimited="true" ctrlrange="-7 7"/>
-    <motor class="t1" name="Head_pitch" joint="Head_pitch" ctrllimited="true" ctrlrange="-7 7"/>
-    <motor class="t1" name="Left_Shoulder_Pitch" joint="Left_Shoulder_Pitch" ctrllimited="true" ctrlrange="-18 18"/>
-    <motor class="t1" name="Left_Shoulder_Roll" joint="Left_Shoulder_Roll" ctrllimited="true" ctrlrange="-18 18"/>
-    <motor class="t1" name="Left_Elbow_Pitch" joint="Left_Elbow_Pitch" ctrllimited="true" ctrlrange="-18 18"/>
-    <motor class="t1" name="Left_Elbow_Yaw" joint="Left_Elbow_Yaw" ctrllimited="true" ctrlrange="-18 18"/>
-    <motor class="t1" name="Right_Shoulder_Pitch" joint="Right_Shoulder_Pitch" ctrllimited="true" ctrlrange="-18 18"/>
-    <motor class="t1" name="Right_Shoulder_Roll" joint="Right_Shoulder_Roll" ctrllimited="true" ctrlrange="-18 18"/>
-    <motor class="t1" name="Right_Elbow_Pitch" joint="Right_Elbow_Pitch" ctrllimited="true" ctrlrange="-18 18"/>
-    <motor class="t1" name="Right_Elbow_Yaw" joint="Right_Elbow_Yaw" ctrllimited="true" ctrlrange="-18 18"/>
-    <motor class="t1" name="Waist" joint="Waist" ctrllimited="true" ctrlrange="-30 30"/>
-    <motor class="t1" name="Left_Hip_Pitch" joint="Left_Hip_Pitch" ctrllimited="true" ctrlrange="-45 45"/>
-    <motor class="t1" name="Left_Hip_Roll" joint="Left_Hip_Roll" ctrllimited="true" ctrlrange="-30 30"/>
-    <motor class="t1" name="Left_Hip_Yaw" joint="Left_Hip_Yaw" ctrllimited="true" ctrlrange="-30 30"/>
-    <motor class="t1" name="Left_Knee_Pitch" joint="Left_Knee_Pitch" ctrllimited="true" ctrlrange="-60 60"/>
-    <motor class="t1" name="Left_Ankle_Pitch" joint="Left_Ankle_Pitch" ctrllimited="true" ctrlrange="-20 20"/>
-    <motor class="t1" name="Left_Ankle_Roll" joint="Left_Ankle_Roll" ctrllimited="true" ctrlrange="-15 15"/>
-    <motor class="t1" name="Right_Hip_Pitch" joint="Right_Hip_Pitch" ctrllimited="true" ctrlrange="-45 45"/>
-    <motor class="t1" name="Right_Hip_Roll" joint="Right_Hip_Roll" ctrllimited="true" ctrlrange="-30 30"/>
-    <motor class="t1" name="Right_Hip_Yaw" joint="Right_Hip_Yaw" ctrllimited="true" ctrlrange="-30 30"/>
-    <motor class="t1" name="Right_Knee_Pitch" joint="Right_Knee_Pitch" ctrllimited="true" ctrlrange="-60 60"/>
-    <motor class="t1" name="Right_Ankle_Pitch" joint="Right_Ankle_Pitch" ctrllimited="true" ctrlrange="-20 20"/>
-    <motor class="t1" name="Right_Ankle_Roll" joint="Right_Ankle_Roll" ctrllimited="true" ctrlrange="-15 15"/>
+    <motor class="t1" name="AAHead_yaw" joint="AAHead_yaw" ctrllimited="true" ctrlrange="-7 7" gear="1"/>
+    <motor class="t1" name="Head_pitch" joint="Head_pitch" ctrllimited="true" ctrlrange="-7 7" gear="1"/>
+    <motor class="t1" name="Left_Shoulder_Pitch" joint="Left_Shoulder_Pitch" ctrllimited="true" ctrlrange="-18 18" gear="1"/>
+    <motor class="t1" name="Left_Shoulder_Roll" joint="Left_Shoulder_Roll" ctrllimited="true" ctrlrange="-18 18" gear="1"/>
+    <motor class="t1" name="Left_Elbow_Pitch" joint="Left_Elbow_Pitch" ctrllimited="true" ctrlrange="-18 18" gear="1"/>
+    <motor class="t1" name="Left_Elbow_Yaw" joint="Left_Elbow_Yaw" ctrllimited="true" ctrlrange="-18 18" gear="1"/>
+    <motor class="t1" name="Right_Shoulder_Pitch" joint="Right_Shoulder_Pitch" ctrllimited="true" ctrlrange="-18 18" gear="1"/>
+    <motor class="t1" name="Right_Shoulder_Roll" joint="Right_Shoulder_Roll" ctrllimited="true" ctrlrange="-18 18" gear="1"/>
+    <motor class="t1" name="Right_Elbow_Pitch" joint="Right_Elbow_Pitch" ctrllimited="true" ctrlrange="-18 18" gear="1"/>
+    <motor class="t1" name="Right_Elbow_Yaw" joint="Right_Elbow_Yaw" ctrllimited="true" ctrlrange="-18 18" gear="1"/>
+    <motor class="t1" name="Waist" joint="Waist" ctrllimited="true" ctrlrange="-30 30" gear="1"/>
+    <motor class="t1" name="Left_Hip_Pitch" joint="Left_Hip_Pitch" ctrllimited="true" ctrlrange="-45 45" gear="1"/>
+    <motor class="t1" name="Left_Hip_Roll" joint="Left_Hip_Roll" ctrllimited="true" ctrlrange="-30 30" gear="1"/>
+    <motor class="t1" name="Left_Hip_Yaw" joint="Left_Hip_Yaw" ctrllimited="true" ctrlrange="-30 30" gear="1"/>
+    <motor class="t1" name="Left_Knee_Pitch" joint="Left_Knee_Pitch" ctrllimited="true" ctrlrange="-60 60" gear="1"/>
+    <motor class="t1" name="Left_Ankle_Pitch" joint="Left_Ankle_Pitch" ctrllimited="true" ctrlrange="-20 20" gear="1"/>
+    <motor class="t1" name="Left_Ankle_Roll" joint="Left_Ankle_Roll" ctrllimited="true" ctrlrange="-15 15" gear="1"/>
+    <motor class="t1" name="Right_Hip_Pitch" joint="Right_Hip_Pitch" ctrllimited="true" ctrlrange="-45 45" gear="1"/>
+    <motor class="t1" name="Right_Hip_Roll" joint="Right_Hip_Roll" ctrllimited="true" ctrlrange="-30 30" gear="1"/>
+    <motor class="t1" name="Right_Hip_Yaw" joint="Right_Hip_Yaw" ctrllimited="true" ctrlrange="-30 30" gear="1"/>
+    <motor class="t1" name="Right_Knee_Pitch" joint="Right_Knee_Pitch" ctrllimited="true" ctrlrange="-60 60" gear="1"/>
+    <motor class="t1" name="Right_Ankle_Pitch" joint="Right_Ankle_Pitch" ctrllimited="true" ctrlrange="-20 20" gear="1"/>
+    <motor class="t1" name="Right_Ankle_Roll" joint="Right_Ankle_Roll" ctrllimited="true" ctrlrange="-15 15" gear="1"/>
   </actuator>
 
   <keyframe>

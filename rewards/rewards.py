@@ -12,7 +12,7 @@ from flax import linen as nn
 # contact: jnp.array of whether left or right foot is in contact. 0 for not 1 for yes
 # foot_frc: a 2 by 6 array of foot forces
 
-def reward_foot_force(foot_frc, threshold: float = 500, max_reward: float = 400):
+def reward_foot_force(foot_frc, threshold: float = 300, max_reward: float = 200):
    """
    Reward for net force on foot, not dependent on phase
    """
