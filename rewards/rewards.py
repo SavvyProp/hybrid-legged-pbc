@@ -184,6 +184,10 @@ def reward_xyvel_local(ids, data, target_vel, std, halt):
    vel_err = jnp.square(local_vel - target_vel * ( 1 - halt ))
    return jnp.exp(-jnp.sum(vel_err) / (std**2))
 
+def reward_xyvel_sensorlinvel(linvel, target_vel, std, halt):
+   vel_err = jnp.square(linvel[0:2] - target_vel * (1 - halt))
+   return jnp.exp(-jnp.sum(vel_err) / (std**2))
+
 def reward_z_vel(ids, data):
    return jnp.square(data.xd.vel[ids["base_id"]][2])
 

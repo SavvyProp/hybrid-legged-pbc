@@ -1,11 +1,14 @@
 import jax.numpy as jnp
 
 def logit2limit(logit, ids):
-    joint20_limits = ids["jnt_limits"]
-    center = jnp.mean(joint20_limits, axis=1)
-    d_top = joint20_limits[:, 1] - center
-    tanh_mag = jnp.abs(d_top)
-    return jnp.tanh(logit) * tanh_mag + center
+    #joint20_limits = ids["jnt_limits"]
+    #center = jnp.mean(joint20_limits, axis=1)
+    #d_top = joint20_limits[:, 1] - center
+    #tanh_mag = jnp.abs(d_top)
+    #return jnp.tanh(logit) * tanh_mag + center
+    center = ids["default_qpos"][7:]
+    scale = 0.5
+    return jnp.tanh(logit) * scale + center
 
 def logit2vel(logit):
     max_vel = 10.0
@@ -24,7 +27,7 @@ def step(mjx_model, state, act, ids):
     qd = state.qvel[ids["joint_vel_ids"]][6:]
 
     u_nn_p = (des_pos - qc) * kp
-    u_nn_d = (des_vel - qd) * kd
+    u_nn_d = (des_vel - qd) * kd * 0.1
 
     u = u_nn_p + u_nn_d
     return u, state

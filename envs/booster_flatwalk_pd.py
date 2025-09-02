@@ -289,9 +289,16 @@ class FlatwalkEnv(PDPipelineEnv):
         halt = info["halt_cmd"]
 
         reward_dict = {}
-        reward_dict["lin_vel_xy"] = rewards.reward_xyvel_local(
-            self.ids,
-            data0,
+        #reward_dict["lin_vel_xy"] = rewards.reward_xyvel_local(
+        #    self.ids,
+        #    data0,
+        #    target_vel,
+        #    0.5,
+        #    halt
+        #) * weight_dict["lin_vel_xy"]
+        sensor_linvel = self.get_sensor_data(data0, self.vel)
+        reward_dict["lin_vel_xy"] = rewards.reward_xyvel_sensorlinvel(
+            sensor_linvel,
             target_vel,
             0.5,
             halt
