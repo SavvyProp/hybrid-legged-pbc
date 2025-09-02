@@ -156,6 +156,7 @@ class FlatwalkEnv(PDPipelineEnv):
         tmod = jnp.mod(state.info["time"], state.info["event_period"][0] +
                        state.info["event_period"][1])
         halt = jnp.where(tmod > state.info["event_period"][0], 1, 0)[0]
+        halt = 0.0
         state.info["halt_cmd"] = 0.0
         new_phase = jnp.zeros([1])
         state.info["phase"] = state.info["phase"] * (1 - halt) + new_phase * halt
@@ -223,8 +224,9 @@ class FlatwalkEnv(PDPipelineEnv):
         reward, done = self.rewards(data1, state, contact, left_frc, right_frc, raw_action)
 
         state.info["time"] += self.dt
-        state.info["phase"] = jnp.mod(state.info["phase"] + self.dt, 
-                                      state.info["cmd"]["phase_period"]) / state.info["cmd"]["phase_period"]
+        #state.info["phase"] = jnp.mod(state.info["phase"] + self.dt, 
+        #                              state.info["cmd"]["phase_period"]) / state.info["cmd"]["phase_period"]
+        state.info["phase"] = jnp.mod(state.info["phase"] + self.dt / PHASE_DURATION, 1.0)
 
         air_time = state.info["air_time"]
         contact_time = state.info["contact_time"]

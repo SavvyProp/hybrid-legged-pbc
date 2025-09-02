@@ -72,6 +72,7 @@ for c in range(1000):
     #nn_p, nn_d = raw_pd(raw_action)
     state = jit_step(state, ctrl)
     pipeline_state = state.pipeline_state
+    print(state.info["phase"])
     #nn_p_list += [nn_p]
     #nn_p_list += [nn_p]
     ctrl_list += [ctrl]
