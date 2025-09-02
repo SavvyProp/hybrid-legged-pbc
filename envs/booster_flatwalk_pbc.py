@@ -272,6 +272,7 @@ class FlatwalkEnv(PBCPipelineEnv):
          w, oriens_logit, base_acc, select) = ctrl2logits(act, self.ids)
 
 
+
         info = state.info
         
         air_time = info["air_time"]
@@ -282,8 +283,10 @@ class FlatwalkEnv(PBCPipelineEnv):
             left_frc[None, :], right_frc[None, :]
         ], axis = 0)
 
-        target_vel = jnp.array([0.3, 0.0])
-        target_angvel = 0.0
+        #target_vel = jnp.array([0.3, 0.0])
+        #target_angvel = 0.0
+        target_vel = info["cmd"]["vel"]
+        target_angvel = info["cmd"]["angvel"][0]
 
         halt = info["halt_cmd"]
 
@@ -292,16 +295,16 @@ class FlatwalkEnv(PBCPipelineEnv):
             self.ids,
             data0,
             target_vel,
-            halt,
-            0.5
+            0.5,
+            halt
         ) * weight_dict["lin_vel_xy"]
 
         reward_dict["angvel_z"] = rewards.reward_track_z_angvel(
             self.ids,
             data0,
             target_angvel,
-            halt,
-            0.5
+            0.5,
+            halt
         ) * weight_dict["angvel_z"]
 
         reward_dict["lin_vel_z_l2"] = rewards.reward_z_vel(
