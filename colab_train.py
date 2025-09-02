@@ -20,7 +20,7 @@ def make_trainfn():
         value_hidden_layer_sizes=(512, 256, 256, 128),
         policy_hidden_layer_sizes=(1024, 512, 512, 256, 256),
         distribution_type = "normal",
-        noise_std_type = "log"
+        noise_std_type = "scalar"
     )
 
     train_fn = functools.partial(
