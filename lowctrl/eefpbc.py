@@ -240,7 +240,7 @@ def pbc(qpos, qvel, m_uc, h_uc, joint_traj, eef_acc,
 
     u_b_ff = u_b_ff_grv # + u_b_ff_acc * 1.0
 
-    u_b_fb = ids["p_gains"] * ec_ik + ids["d_gains"] * ec_ik_dot
+    u_b_fb = ids["p_gains"] * ec_ik # + ids["d_gains"] * ec_ik_dot
     return u_b_ff, u_b_fb, lmbda
 
 def step(mjx_model, state, act, ids):

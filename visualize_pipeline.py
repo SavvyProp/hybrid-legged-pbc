@@ -13,7 +13,8 @@ import mujoco.viewer
 import jax.numpy as jnp
 import numpy as np
 from brax.training.acme import running_statistics
-from playground.booster import joystick
+#from playground.booster import joystick
+from playground.booster import joystick_pbc as joystick
 from playground.booster.config import ppo_params
 env = joystick.Joystick()
 
@@ -39,7 +40,7 @@ def makeIFN():
     make_inference_fn = ppo_networks.make_inference_fn(ppo_network)
     return make_inference_fn
 
-dir = "training/test_4"
+dir = "training/test_5"
 
 model_path = dir + "/walk_policy"
 saved_params = model.load_params(model_path)
