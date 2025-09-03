@@ -244,7 +244,6 @@ def pbc(qpos, qvel, m_uc, h_uc, joint_traj, eef_acc,
     return u_b_ff, u_b_fb, lmbda
 
 def step(mjx_model, state, act, ids):
-    start_qvel = state.qvel_low_freq
 
     jacs = jac_stack(mjx_model, state, ids)
     m_uc, h_uc = get_mh(mjx_model, state, ids)
@@ -277,8 +276,10 @@ def step(mjx_model, state, act, ids):
     #u = u_b_ff
     #u = -u_b_fb
 
-    f_stc = lmbda[: ids["eef_num"] * 6]
+    #f_stc = lmbda[: ids["eef_num"] * 6]
 
-    state = state.replace(f_stc = f_stc)
+    #state = state.replace(f_stc = f_stc)
+    tau_limits = ids["tau_limits"]
+    u = jnp.clip(u, -tau_limits, tau_limits)
 
-    return u, state
+    return u
