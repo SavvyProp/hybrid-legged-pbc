@@ -14,7 +14,7 @@ PHASE_DURATION = 0.64
 
 weight_dict = {
     "lin_vel_xy": 2.,
-    "angvel_z": 2.,
+    "angvel_z": 1.,
     "lin_vel_z_l2": -0.5, #-1.,
     "angvel_xy_l2": -0.05,
     "termination": -200,
@@ -24,7 +24,7 @@ weight_dict = {
     "joint_limits": -0.5,
     "base_flat_orien": -2.,
     "feet_slip": -0.5,
-    "feet_airtime": 0.25,
+    "feet_airtime": 6.0,
     "feet_force": -3e-3,
     "feet_contact": 2.0,
     "feet_height_track": 0.5,
@@ -347,7 +347,7 @@ class FlatwalkEnv(PDPipelineEnv):
         ) * weight_dict["feet_slip"]
 
         reward_dict["feet_airtime"] = rewards.reward_foot_air_time(
-            air_time, contact_time, 0.34, halt
+            air_time, contact_time, 0.20, halt
         ) * weight_dict["feet_airtime"]
 
         reward_dict["feet_force"] = rewards.reward_foot_force(
