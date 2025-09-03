@@ -572,7 +572,7 @@ class Joystick(t1_base.T1Env):
          gnd_acc_logit, qp_weight_logit, tau_mix_logit, 
          w, oriens_logit, base_acc, select) = ctrl2logits(action, self.ids)
     #tau = jp.clip(tau_mix_logit, 0.0, 1.0)
-    return jp.sum(tau_mix_logit)
+    return rewards.reward_tau_min(tau_mix_logit)
 
   def _cost_pbc_w(self, action, contact):
     (des_pos_logit, 
