@@ -324,7 +324,7 @@ class Joystick(t1_base.T1Env):
 
     # state = self._reset_if_outside_bounds(state)
 
-    motor_targets = self._default_pose + action * self._config.action_scale
+    motor_targets = action #self._default_pose + action * self._config.action_scale
     data = mjx_env.step(
         self.mjx_model, state.data, motor_targets, self.n_substeps
     )

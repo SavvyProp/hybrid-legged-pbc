@@ -1,18 +1,7 @@
-from lowctrl.eefpbc import ctrl2components
-from models.booster_t1.booster_ids import ids
-from pipelines.booster_eefpbc import default_act
+from mujoco_playground.config import locomotion_params
 
-ctrl = default_act()
+env_name = "T1JoystickFlatTerrain"
 
-(des_pos, gnd_acc, 
-     qp_weights, tau_mix, 
-     w, oriens, 
-     base_acc, select) = ctrl2components(ctrl, ids)
+ppo_params = locomotion_params.brax_ppo_config(env_name)
 
-
-print(des_pos)
-
-print(ids["p_gains"])
-print(ids["d_gains"])
-print(ids["jnt_limits"])
-print(ids["col"])
+print(ppo_params)

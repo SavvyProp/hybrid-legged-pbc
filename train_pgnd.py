@@ -12,7 +12,8 @@ env = joystick.Joystick()
 env_cfg = joystick.default_config()
 env_name = "T1JoystickFlatTerrain"
 
-ppo_params = locomotion_params.brax_ppo_config(env_name)
+from playground.booster.config import ppo_params
+ppo_training_params = dict(ppo_params)
 
 
 x_data, y_data, y_dataerr = [], [], []
@@ -33,7 +34,7 @@ def progress(num_steps, metrics):
   plt.errorbar(x_data, y_data, yerr=y_dataerr, color="blue")
   plt.show()
 
-ppo_training_params = dict(ppo_params)
+
 network_factory = ppo_networks.make_ppo_networks
 if "network_factory" in ppo_params:
   del ppo_training_params["network_factory"]

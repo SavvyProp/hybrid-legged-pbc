@@ -11,9 +11,8 @@ from mujoco_playground import wrapper
 def make_trainfn():
     env = joystick.Joystick()
     env_cfg = joystick.default_config()
+    from playground.booster.config import ppo_params
     env_name = "T1JoystickFlatTerrain"
-
-    ppo_params = locomotion_params.brax_ppo_config(env_name)
 
 
     x_data, y_data, y_dataerr = [], [], []
