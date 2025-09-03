@@ -95,14 +95,16 @@ def load_gains():
     # Extract h_gains directly from iik
     joint_p = []
     joint_d = []
+    joint_torque = []
 
     for joint_name in joint_names:
         joint_p.append(config[joint_name][0])
         joint_d.append(config[joint_name][1])
+        joint_torque.append(config[joint_name][2])
 
-    return joint_p, joint_d
+    return joint_p, joint_d, joint_torque
 
-p, d = load_gains()
+p, d, tau = load_gains()
 
 eef_num = len(eefnames)
 
@@ -128,11 +130,12 @@ ids = {
     "jnt_limits": jnt_limits,
     "p_gains": jnp.array(p),
     "d_gains": jnp.array(d),
+    "tau_limits": jnp.array(tau),
     "eef": eef_dict,
     "eef_num": eef_num,
     "ctrl_num": len(joint_names),
     "default_qpos": default_qpos,
     "max_vel": max_vel,
     "base_id": base_id,
-    "col": col_dict
+    "col": col_dict,
 }

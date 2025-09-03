@@ -30,4 +30,7 @@ def step(mjx_model, state, act, ids):
     u_nn_d = (des_vel - qd) * kd * 0.1
 
     u = u_nn_p + u_nn_d
+
+    tau_limits = ids["tau_limits"]
+    u = jnp.clip(u, -tau_limits, tau_limits)
     return u, state
