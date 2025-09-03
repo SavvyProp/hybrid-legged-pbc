@@ -27,7 +27,9 @@ from mujoco_playground._src import gait
 from mujoco_playground._src import mjx_env
 #from mujoco_playground._src.locomotion.t1 import base as t1_base
 from mujoco_playground._src.locomotion.t1 import t1_constants as consts
-from playground.booster import base_pd as t1_base
+from playground.booster import base_pbc as t1_base
+from rewards import rewards
+from lowctrl.eefpbc import ctrl2logits
 
 def default_config() -> config_dict.ConfigDict:
   return config_dict.create(
@@ -81,6 +83,7 @@ def default_config() -> config_dict.ConfigDict:
               pose=-1.0,
               feet_distance=-1.0,
               collision=-1.0,
+              pbc_w=-1.0
           ),
           tracking_sigma=0.25,
           max_foot_height=0.12,
@@ -555,9 +558,16 @@ class Joystick(t1_base.T1Env):
         "dof_pos_limits": self._cost_joint_pos_limits(data.qpos[7:]),
         "pose": self._cost_pose(data.qpos[7:]),
         "feet_distance": self._cost_feet_distance(data, info),
+        "pbc_w": self._cost_pbc_w(action, contact),
     }
 
   # Tracking rewards.
+
+  def _cost_pbc_w(self, action, contact):
+    (des_pos_logit, 
+         gnd_acc_logit, qp_weight_logit, tau_mix_logit, 
+         w, oriens_logit, base_acc, select) = ctrl2logits(action, self.ids)
+    return rewards.reward_pbc_w_leg_only(w, contact)
 
   def _reward_tracking_lin_vel(
       self,
