@@ -16,6 +16,8 @@ from brax.training.acme import running_statistics
 #from playground.booster import joystick
 from playground.booster import joystick_pbc as joystick
 from playground.booster.config import ppo_params
+from lowctrl.eefpbc import ctrl2components
+
 env = joystick.Joystick()
 
 jit_reset = jax.jit(env.reset)
@@ -39,6 +41,14 @@ def makeIFN():
     )
     make_inference_fn = ppo_networks.make_inference_fn(ppo_network)
     return make_inference_fn
+
+def debug_eefpbc(act):
+    from models.booster_t1_pgnd.booster_ids import ids
+    (des_pos, gnd_acc, 
+     qp_weights, tau_mix, 
+     w, oriens, 
+     base_acc, select) = ctrl2components(act, ids)
+    print(w, tau_mix)
 
 dir = "training/test_6"
 
@@ -66,6 +76,7 @@ for c in range(1000):
     act_rng, rng = jax.random.split(rng)
     obs_list += [state.obs]
     ctrl, _ = jit_inference_fn(state.obs, act_rng)
+    debug_eefpbc(ctrl)
     #raw_action = ctrl[2 * HIDDEN_SIZE * DEPTH:]
     #nn_p, nn_d = raw_pd(raw_action)
     state = jit_step(state, ctrl)
@@ -89,7 +100,6 @@ while True:
         #print(obs_list[c1])
         pipeline_state = pipeline_state_list[c1]
         state = states[c1]
-        print(ctrl_list[c1])
         #print(state.info["phase"])
         #print(state.metrics)
         time.sleep(0.05)
