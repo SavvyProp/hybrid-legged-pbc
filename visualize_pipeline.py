@@ -40,7 +40,7 @@ def makeIFN():
     make_inference_fn = ppo_networks.make_inference_fn(ppo_network)
     return make_inference_fn
 
-dir = "training/test_5"
+dir = "training/test_6"
 
 model_path = dir + "/walk_policy"
 saved_params = model.load_params(model_path)

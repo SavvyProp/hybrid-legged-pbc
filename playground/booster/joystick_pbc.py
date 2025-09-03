@@ -85,7 +85,7 @@ def default_config() -> config_dict.ConfigDict:
               feet_distance=-1.0,
               collision=-1.0,
               pbc_w=-1.0,
-              tau_min=0.5
+              tau_min=0.05
           ),
           tracking_sigma=0.25,
           max_foot_height=0.12,
