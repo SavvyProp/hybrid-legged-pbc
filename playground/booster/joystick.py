@@ -465,7 +465,7 @@ class Joystick(t1_base.T1Env):
         info["command"],  # 3
         noisy_joint_angles - self._default_pose,
         noisy_joint_vel,
-        info["last_act"],
+        jp.tanh(info["last_act"]),
         phase,
     ])
 
