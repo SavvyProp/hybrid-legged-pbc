@@ -237,8 +237,8 @@ class FlatwalkEnv(PDPipelineEnv):
         state.info["air_time"] = air_time
         state.info["contact_time"] = contact_time
 
-        self.updateCmd(state)
-        self.periodicHalting(state)
+        #self.updateCmd(state)
+        #self.periodicHalting(state)
 
         new_state = state.replace(
             pipeline_state = data1, obs = obs, reward = reward, done = done
