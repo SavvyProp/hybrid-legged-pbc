@@ -1,6 +1,5 @@
 from datetime import datetime
 import functools
-from brax import envs
 from brax.training.agents.ppo import train as ppo
 from brax.training.agents.ppo import networks as ppo_networks
 from brax.io import model
@@ -13,9 +12,10 @@ import mujoco.mjx as mjx
 import mujoco.viewer
 import jax.numpy as jnp
 import numpy as np
-
-envs.register_environment('digit', FlatwalkEnv)
-env = envs.get_environment('digit')
+from brax.training.acme import running_statistics
+from playground.booster import joystick
+from playground.booster.config import ppo_params
+env = joystick.Joystick()
 
 jit_reset = jax.jit(env.reset)
 jit_step = jax.jit(env.step)
@@ -27,13 +27,11 @@ def makeIFN():
     import networks.mlp as mlp
     network_factory = functools.partial(
         ppo_networks.make_ppo_networks,
-        value_hidden_layer_sizes=(512, 256, 256, 128),
-        policy_hidden_layer_sizes=(1024, 512, 512, 256, 256),
-        distribution_type = "normal",
-        noise_std_type = "scalar"
+        **ppo_params.network_factory
     )
     # normalize = running_statistics.normalize
-    normalize = lambda x, y: x
+    #normalize = lambda x, y: x
+    normalize = running_statistics.normalize
     obs_size = env.observation_size
     ppo_network = network_factory(
         obs_size, env.action_size, preprocess_observations_fn=normalize
@@ -41,7 +39,7 @@ def makeIFN():
     make_inference_fn = ppo_networks.make_inference_fn(ppo_network)
     return make_inference_fn
 
-dir = "training/test_3"
+dir = "training/test_4"
 
 model_path = dir + "/walk_policy"
 saved_params = model.load_params(model_path)
@@ -52,7 +50,7 @@ inference_fn = makeIFN()(saved_params)
 jit_inference_fn = jax.jit(inference_fn)
 
 rng = jax.random.PRNGKey(0)
-mj_model = mujoco.MjModel.from_xml_path('models/booster_t1/flat_scene.xml')
+mj_model = mujoco.MjModel.from_xml_path('models/booster_t1_pgnd/scene_mjx_feetonly_flat_terrain.xml')
 data = mujoco.MjData(mj_model)
 init_qpos = mj_model.keyframe('home').qpos
 data.qpos = init_qpos
@@ -63,7 +61,6 @@ obs_list = []
 nn_p_list = []
 states = []
 
-
 for c in range(1000):
     act_rng, rng = jax.random.split(rng)
     obs_list += [state.obs]
@@ -71,13 +68,11 @@ for c in range(1000):
     #raw_action = ctrl[2 * HIDDEN_SIZE * DEPTH:]
     #nn_p, nn_d = raw_pd(raw_action)
     state = jit_step(state, ctrl)
-    pipeline_state = state.pipeline_state
-    print(state.info["phase"])
+    pipeline_state = state.data
     #nn_p_list += [nn_p]
     #nn_p_list += [nn_p]
     ctrl_list += [ctrl]
     states += [state]
-    pipeline_state = pipeline_state.replace(act = jnp.zeros([0]))
     pipeline_state_list += [pipeline_state]
 
 

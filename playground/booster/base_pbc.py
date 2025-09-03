@@ -36,6 +36,8 @@ def step(
 ) -> mjx.Data:
   def single_step(data, _):
     ctrl = eefpbc.step(model, data, action, bids.ids)
+    #print(ctrl)
+    #print(data.ctrl)
     data = data.replace(ctrl = ctrl)
     data = mjx.step(model, data)
     return data, None
@@ -140,7 +142,9 @@ class T1Env(mjx_env.MjxEnv):
 
   @property
   def action_size(self) -> int:
-    return self.ids["ctrl_num"]
+    jnt_num = self.ids["ctrl_num"]
+    eef_num = self.ids["eef_num"]
+    return 2 * jnt_num + eef_num * 10 + 9
 
   @property
   def mj_model(self) -> mujoco.MjModel:

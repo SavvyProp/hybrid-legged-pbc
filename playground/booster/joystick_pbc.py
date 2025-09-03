@@ -29,7 +29,8 @@ from mujoco_playground._src import mjx_env
 from mujoco_playground._src.locomotion.t1 import t1_constants as consts
 from playground.booster import base_pbc as t1_base
 from rewards import rewards
-from lowctrl.eefpbc import ctrl2logits
+from lowctrl.eefpbc import ctrl2logits, default_act
+from playground.booster.base_pbc import step as pbc_step
 
 def default_config() -> config_dict.ConfigDict:
   return config_dict.create(
@@ -83,7 +84,8 @@ def default_config() -> config_dict.ConfigDict:
               pose=-1.0,
               feet_distance=-1.0,
               collision=-1.0,
-              pbc_w=-1.0
+              pbc_w=-1.0,
+              tau_min=0.5
           ),
           tracking_sigma=0.25,
           max_foot_height=0.12,
@@ -270,7 +272,8 @@ class Joystick(t1_base.T1Env):
         "command": cmd,
         "last_act": jp.zeros(self.action_size),
         "last_last_act": jp.zeros(self.action_size),
-        "motor_targets": jp.zeros(self.action_size),
+        #"motor_targets": jp.zeros(self.action_size),
+        "motor_targets": default_act(self.ids),
         "feet_air_time": jp.zeros(2),
         "last_contact": jp.zeros(2, dtype=bool),
         "swing_peak": jp.zeros(2),
@@ -328,7 +331,7 @@ class Joystick(t1_base.T1Env):
     # state = self._reset_if_outside_bounds(state)
 
     motor_targets = action #self._default_pose + action * self._config.action_scale
-    data = mjx_env.step(
+    data = pbc_step(
         self.mjx_model, state.data, motor_targets, self.n_substeps
     )
     state.info["motor_targets"] = motor_targets
@@ -559,9 +562,17 @@ class Joystick(t1_base.T1Env):
         "pose": self._cost_pose(data.qpos[7:]),
         "feet_distance": self._cost_feet_distance(data, info),
         "pbc_w": self._cost_pbc_w(action, contact),
+        "tau_min": self._cost_tau_min(action),
     }
 
   # Tracking rewards.
+
+  def _cost_tau_min(self, action):
+    (des_pos_logit, 
+         gnd_acc_logit, qp_weight_logit, tau_mix_logit, 
+         w, oriens_logit, base_acc, select) = ctrl2logits(action, self.ids)
+    #tau = jp.clip(tau_mix_logit, 0.0, 1.0)
+    return jp.sum(tau_mix_logit)
 
   def _cost_pbc_w(self, action, contact):
     (des_pos_logit, 

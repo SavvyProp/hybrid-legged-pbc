@@ -283,3 +283,27 @@ def step(mjx_model, state, act, ids):
     u = jnp.clip(u, -tau_limits, tau_limits)
 
     return u
+
+def default_act(ids):
+	pos = ids["default_qpos"][7:]
+	gnd_acc = jnp.zeros((ids["eef_num"], 6))
+	qp_weights = jnp.array([4, 4])
+	tau_mix = jnp.ones([ids["ctrl_num"]]) * 5.0
+	w = jnp.array([10., 10., -5., -5.])
+	target_orien = jnp.array([
+       [0., 0., 1.],
+       [0., 0., 1.],
+       [0., 0., 1.],
+	   [0., 0., 1.]
+    ]).flatten()
+	base_acc = jnp.zeros([6,])
+	select = jnp.array([-10.0])
+	act = jnp.concatenate([pos, 
+                           jnp.reshape(gnd_acc, (-1,)), 
+                           qp_weights, 
+                           tau_mix, 
+                           w, 
+                           target_orien, 
+                           base_acc,
+                           select])
+	return act

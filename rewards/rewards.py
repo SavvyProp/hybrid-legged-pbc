@@ -239,3 +239,6 @@ def reward_jnt_acc(qacc):
 
 def reward_jnt_vel(jnt_vel):
    return jnp.sum(jnp.square(jnt_vel))
+
+def reward_tau_min(tau_logits):
+   return jnp.mean(nn.sigmoid(tau_logits))
