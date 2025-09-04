@@ -208,7 +208,7 @@ def iterative_ik(gnd_acc, base_acc, jacs, jvp, ids):
     return (q_dot, q_ddot_f)
 
 
-def pbc(qpos, qvel, m_uc, h_uc, des_pos, dots, eef_acc, 
+def pbc(qpos, qvel, m_uc, h_uc, des_pos, eef_acc, 
         jacs, jvp, cons_stack, ids):
     ju = jacs[:, :6]
     jc = jacs[:, 6:]
@@ -264,13 +264,13 @@ def pbc(qpos, qvel, m_uc, h_uc, des_pos, dots, eef_acc,
     lmbda = jnp.linalg.solve(d11, b)
 
     ec_ik = qpos[7:] - des_pos[0]
-    ec_ik_dot = qvel[6:] - dots[0][6:]
+    #ec_ik_dot = qvel[6:]
 
     u_b_ff_grv = jnp.nan_to_num(hbar, posinf = 0.0, neginf = 0.0, nan = 0.0)
 
     u_b_ff = u_b_ff_grv # + u_b_ff_acc * 1.0
 
-    u_b_fb = ids["p_gains"] * ec_ik + 0.1 * ids["d_gains"] * ec_ik_dot
+    u_b_fb = ids["p_gains"] * ec_ik# + 0.1 * ids["d_gains"] * ec_ik_dot
     return u_b_ff, u_b_fb, lmbda
 
 def step(mjx_model, state, act, ids):
@@ -298,9 +298,9 @@ def step(mjx_model, state, act, ids):
                          oriens, s, w, jacs[:, :6], ids)
     
     
-    dots = iterative_ik(gnd_acc, base_acc, jacs, jvp, ids)
+    #dots = iterative_ik(gnd_acc, base_acc, jacs, jvp, ids)
     
-    u_b_ff, u_b_fb, lmbda = pbc(qpos, qvel, m_uc, h_uc, des_pos, dots, gnd_acc, 
+    u_b_ff, u_b_fb, lmbda = pbc(qpos, qvel, m_uc, h_uc, des_pos, gnd_acc, 
                                jacs, jvp, cons_stack, ids)
     
     u = u_b_ff * tau_mix - u_b_fb
