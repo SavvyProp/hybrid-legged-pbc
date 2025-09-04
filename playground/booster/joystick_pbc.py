@@ -575,12 +575,13 @@ class Joystick(t1_base.T1Env):
      qp_weights, tau_mix, 
      w, oriens, 
      base_acc, select) = ctrl2components(action, self.ids)
-    gnd_acc = jp.reshape(gnd_acc, (-1, 3))
-    gnd_norm = jp.linalg.norm(gnd_acc, axis=-1)
-    base_norm = jp.linalg.norm(base_acc)
+    #gnd_acc = jp.reshape(gnd_acc, (-1, 3))
+    #gnd_norm = jp.linalg.norm(gnd_acc, axis=-1)
+    #base_norm = jp.linalg.norm(base_acc)
 
     #rew = jp.exp(-(jp.sum(gnd_norm) + base_norm) / 5.0)
-    rew = (jp.sum(gnd_norm) + base_norm) / 5.0
+    #rew = (jp.sum(gnd_norm) + base_norm) / 5.0
+    rew = jp.sum(jp.square(gnd_acc)) + jp.sum(jp.square(base_acc))
     return rew
 
   # Tracking rewards.
