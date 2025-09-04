@@ -302,7 +302,7 @@ def pbc(qpos, qvel, m_uc, h_uc, joint_traj, eef_acc,
     ec_ik = qpos[7:] - joint_traj[0]
     ec_ik_dot = qvel[6:] - joint_traj[1]
 
-    u_b_ff_grv = hbar
+    u_b_ff_grv = jnp.nan_to_num(hbar, posinf = 0.0, neginf = 0.0, nan = 0.0)
 
     u_b_ff = u_b_ff_grv # + u_b_ff_acc * 1.0
 
