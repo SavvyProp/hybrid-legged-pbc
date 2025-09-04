@@ -48,7 +48,7 @@ def debug_eefpbc(act):
      qp_weights, tau_mix, 
      w, oriens, 
      base_acc, select) = ctrl2components(act, ids)
-    print(w, tau_mix)
+    print(w, tau_mix, gnd_acc)
 
 dir = "training/test_pbc_1"
 
@@ -101,7 +101,7 @@ viewer = mujoco.viewer.launch_passive(mj_model, data)
 import time
 while True:
     for c1 in range(1000):
-        print("=========================")
+        #print("=========================")
         #print(ctrl_list[c1])
         #print(nn_p_list[c1])
         #print(obs_list[c1])

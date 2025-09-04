@@ -29,7 +29,7 @@ from mujoco_playground._src import mjx_env
 from mujoco_playground._src.locomotion.t1 import t1_constants as consts
 from playground.booster import base_pbc as t1_base
 from rewards import rewards
-from lowctrl.eefpbc import ctrl2logits, default_act
+from lowctrl.eefpbc import ctrl2logits, ctrl2components, default_act
 from playground.booster.base_pbc import step as pbc_step
 from rewards.mjx_col import get_contacts
 
@@ -86,7 +86,8 @@ def default_config() -> config_dict.ConfigDict:
               feet_distance=-1.0,
               collision=-1.0,
               pbc_w=-1.0,
-              tau_min=0.10
+              tau_min=0.10,
+              pol_accs= -0.1
           ),
           tracking_sigma=0.25,
           max_foot_height=0.12,
@@ -566,7 +567,21 @@ class Joystick(t1_base.T1Env):
         "feet_distance": self._cost_feet_distance(data, info),
         "pbc_w": self._cost_pbc_w(action, contact),
         "tau_min": self._cost_tau_min(action),
+        "pol_accs": self._cost_pol_accs(action),
     }
+  
+  def _cost_pol_accs(self, action):
+    (des_pos, gnd_acc, 
+     qp_weights, tau_mix, 
+     w, oriens, 
+     base_acc, select) = ctrl2components(action, self.ids)
+    gnd_acc = jp.reshape(gnd_acc, (-1, 3))
+    gnd_norm = jp.linalg.norm(gnd_acc, axis=-1)
+    base_norm = jp.linalg.norm(base_acc)
+
+    #rew = jp.exp(-(jp.sum(gnd_norm) + base_norm) / 5.0)
+    rew = (jp.sum(gnd_norm) + base_norm) / 5.0
+    return rew
 
   # Tracking rewards.
 
