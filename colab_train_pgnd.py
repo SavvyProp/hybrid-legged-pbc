@@ -1,5 +1,5 @@
-from playground.booster import joystick
-#from playground.booster import joystick_pbc as joystick
+#from playground.booster import joystick
+from playground.booster import joystick_pbc as joystick
 
 from mujoco_playground.config import locomotion_params
 from playground.booster.randomize import domain_randomize
