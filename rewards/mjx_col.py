@@ -7,7 +7,10 @@ from typing import Any, Tuple, Union
 def check_collision(contact, geom1, geom2):
    mask = (jnp.array([geom1, geom2]) == contact.geom).all(axis=1)
    mask |= (jnp.array([geom2, geom1]) == contact.geom).all(axis=1)
-   return jnp.any(mask)
+   idx = jnp.where(mask, contact.dist, 1e4).argmin()
+   dist = contact.dist[idx] * mask[idx]
+   #normal = (dist < 0) * contact.frame[idx, 0, :3]
+   return dist < 0
 
 def get_contacts(contact, ids):
     left_foot = jnp.array([ 
