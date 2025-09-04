@@ -35,7 +35,7 @@ from rewards.mjx_col import get_contacts
 
 def default_config() -> config_dict.ConfigDict:
   return config_dict.create(
-      ctrl_dt=0.02,
+      ctrl_dt=0.01,
       sim_dt=0.001,
       episode_length=1000,
       action_repeat=1,
