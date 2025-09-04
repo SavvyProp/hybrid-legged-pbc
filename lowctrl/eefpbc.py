@@ -300,7 +300,7 @@ def step(mjx_model, state, act, ids):
     
     dots = iterative_ik(gnd_acc, base_acc, jacs, jvp, ids)
     
-    u_b_ff, u_b_fb, lmbda = pbc(qpos, qvel, m_uc, h_uc, des_pos, dots, base_acc, 
+    u_b_ff, u_b_fb, lmbda = pbc(qpos, qvel, m_uc, h_uc, des_pos, dots, gnd_acc, 
                                jacs, jvp, cons_stack, ids)
     
     u = u_b_ff * tau_mix - u_b_fb
