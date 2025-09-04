@@ -264,7 +264,7 @@ def pbc(qpos, qvel, m_uc, h_uc, des_pos, dots, eef_acc,
     lmbda = jnp.linalg.solve(d11, b)
 
     ec_ik = qpos[7:] - des_pos[0]
-    ec_ik_dot = qvel[6:] - dots[0]
+    ec_ik_dot = qvel[6:] - dots[0][6:]
 
     u_b_ff_grv = jnp.nan_to_num(hbar, posinf = 0.0, neginf = 0.0, nan = 0.0)
 
