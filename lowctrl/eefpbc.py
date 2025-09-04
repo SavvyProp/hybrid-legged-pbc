@@ -207,62 +207,62 @@ def iterative_ik(gnd_acc, base_acc, jacs, jvp, ids):
 
     return (q_dot, q_ddot_f)
 
+fac = 0.1
 
-def pbc(qpos, qvel, m_uc, h_uc, des_pos, eef_acc, 
-        jacs, jvp, cons_stack, ids):
-    ju = jacs[:, :6]
-    jc = jacs[:, 6:]
-
-    fac = 0.1
-
+def make_dsub(cons_m, ju, jc, m, ids):
     eef_num = ids["eef_num"]
-    ctrl_num = ids["ctrl_num"]
-
-    def make_dsub(cons_m, ju, jc, m):
-        m_uu = m[:6, :6]
-        m_uc = m[:6, 6:]
-        m_cu = m[6:, :6]
-        m_cc = m[6:, 6:]
-        d11 = jnp.block([
+    m_uu = m[:6, :6]
+    m_uc = m[:6, 6:]
+    m_cu = m[6:, :6]
+    m_cc = m[6:, 6:]
+    d11 = jnp.block([
             [cons_m[:, :eef_num * 6] * fac, 
              ju + cons_m[:, eef_num * 6: eef_num * 6 + 6] * fac],
             [ju.T, m_uu]
         ])
 
 
-        d12 = jnp.block([
+    d12 = jnp.block([
             [jc + cons_m[:, eef_num * 6 + 6:] * fac],
             [m_uc]
         ])
 
-        d21 = jnp.block([
+    d21 = jnp.block([
             [jc.T, m_cu]
         ])
 
-        d22 = m_cc
+    d22 = m_cc
 
-        return d11, d12, d21, d22
-    
-    def make_hsub(cons_h, joint_a_cons, h_uc):
-        h1 = jnp.concatenate([
+    return d11, d12, d21, d22
+
+def make_hsub(cons_h, joint_a_cons, h_uc):
+    h1 = jnp.concatenate([
             joint_a_cons + cons_h * fac, h_uc[:6]
         ], axis = 0)
-        h2 = h_uc[6:]
-        return h1, h2
+    h2 = h_uc[6:]
+    return h1, h2
+
+def pbc(qpos, qvel, m_uc, h_uc, des_pos, eef_acc, 
+        jacs, jvp, cons_stack, ids):
+    ju = jacs[:, :6]
+    jc = jacs[:, 6:]
+
+    eef_num = ids["eef_num"]
+    ctrl_num = ids["ctrl_num"]
+
+    
+    
+    
     
     joint_a_cons = jvp - eef_acc.reshape(-1)
     
-    d11, d12, d21, d22 = make_dsub(cons_stack[0], ju, jc, m_uc)
+    d11, d12, d21, d22 = make_dsub(cons_stack[0], ju, jc, m_uc, ids)
 
     h1, h2 = make_hsub(cons_stack[1], joint_a_cons, h_uc)
 
     #bf_sub = jnp.vstack([jnp.zeros([6, ctrl_num]), jnp.eye(23)])
 
     hbar = h2 - d21 @ jnp.linalg.solve(d11, h1)
-    b = -h1
-
-    lmbda = jnp.linalg.solve(d11, b)
-
     ec_ik = qpos[7:] - des_pos[0]
     #ec_ik_dot = qvel[6:]
 
@@ -271,7 +271,42 @@ def pbc(qpos, qvel, m_uc, h_uc, des_pos, eef_acc,
     u_b_ff = u_b_ff_grv # + u_b_ff_acc * 1.0
 
     u_b_fb = ids["p_gains"] * ec_ik# + 0.1 * ids["d_gains"] * ec_ik_dot
-    return u_b_ff, u_b_fb, lmbda
+    return u_b_ff, u_b_fb
+
+def get_eef_force(mjx_model, state, act, ids):
+    jacs = jac_stack(mjx_model, state, ids)
+    m_uc, h_uc = get_mh(mjx_model, state, ids)
+
+    (des_pos, gnd_acc, 
+     qp_weights, tau_mix, 
+     w, oriens, 
+     base_acc, select) = ctrl2components(act, ids)
+    
+    gnd_acc = gnd_acc * 0.0
+    base_acc = base_acc * 0.0
+    
+    s = nn.sigmoid(w)
+    
+
+    jvp = get_djp(mjx_model, state, ids)
+
+
+    cons_stack = qp_cons(m_uc[:6, :], h_uc[:6], qp_weights,
+                         oriens, s, w, jacs[:, :6], ids)
+    
+    
+    #dots = iterative_ik(gnd_acc, base_acc, jacs, jvp, ids)
+    ju = jacs[:, :6]
+    jc = jacs[:, 6:]
+    d11, d12, d21, d22 = make_dsub(cons_stack[0], ju, jc, m_uc, ids)
+
+    joint_a_cons = jvp - gnd_acc.reshape(-1)
+    h1, h2 = make_hsub(cons_stack[1], joint_a_cons, h_uc)
+
+    lmbda = jnp.linalg.solve(d11, -h1)
+    frc = lmbda[:ids["eef_num"] * 6] * -1
+    return frc
+    
 
 def step(mjx_model, state, act, ids):
 
@@ -300,7 +335,7 @@ def step(mjx_model, state, act, ids):
     
     #dots = iterative_ik(gnd_acc, base_acc, jacs, jvp, ids)
     
-    u_b_ff, u_b_fb, lmbda = pbc(qpos, qvel, m_uc, h_uc, des_pos, gnd_acc, 
+    u_b_ff, u_b_fb = pbc(qpos, qvel, m_uc, h_uc, des_pos, gnd_acc, 
                                jacs, jvp, cons_stack, ids)
     
     u = u_b_ff * tau_mix - u_b_fb
