@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import mujoco
 import yaml
 
-model = mujoco.MjModel.from_xml_path("models/booster_t1/flat_scene.xml")
+model = mujoco.MjModel.from_xml_path("models/booster_t1_pgnd/scene_mjx_feetonly_flat_terrain.xml")
 
 joint_names = [
     "AAHead_yaw",
@@ -114,6 +114,21 @@ max_vel = jnp.ones([23]) * 10.0
 
 base_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, 'Trunk')
 
+left_col = [
+    model.geom("left_foot_1").id,
+    model.geom("left_foot_2").id,
+    model.geom("left_foot_3").id,
+    model.geom("left_foot_4").id
+]
+
+right_col = [
+    model.geom("right_foot_1").id,
+    model.geom("right_foot_2").id,
+    model.geom("right_foot_3").id,
+    model.geom("right_foot_4").id
+]
+
+floor_col = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "floor")
 
 ids = {
     "joint_pos_ids": joint_pos_ids,
@@ -128,4 +143,9 @@ ids = {
     "default_qpos": default_qpos,
     "max_vel": max_vel,
     "base_id": base_id,
+    "col": {
+        "left_foot": left_col,
+        "right_foot": right_col,
+        "floor": floor_col
+    }
 }

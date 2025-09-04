@@ -17,7 +17,7 @@ from brax.training.acme import running_statistics
 from playground.booster import joystick_pbc as joystick
 from playground.booster.config import ppo_params
 from lowctrl.eefpbc import ctrl2components
-
+from models.booster_t1_pgnd.booster_ids import ids
 env = joystick.Joystick()
 
 jit_reset = jax.jit(env.reset)
@@ -76,11 +76,17 @@ for c in range(1000):
     act_rng, rng = jax.random.split(rng)
     obs_list += [state.obs]
     ctrl, _ = jit_inference_fn(state.obs, act_rng)
-    debug_eefpbc(ctrl)
+    
     #raw_action = ctrl[2 * HIDDEN_SIZE * DEPTH:]
     #nn_p, nn_d = raw_pd(raw_action)
     state = jit_step(state, ctrl)
     pipeline_state = state.data
+    print(state.data.contact)
+    print(state.info["last_contact"])
+    print(ids["col"])
+    #print(state.data.sensordata)
+    #debug_eefpbc(ctrl)
+    
     #nn_p_list += [nn_p]
     #nn_p_list += [nn_p]
     ctrl_list += [ctrl]

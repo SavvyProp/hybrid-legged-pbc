@@ -4,6 +4,22 @@ import jax
 import mujoco
 from typing import Any, Tuple, Union
 
+def check_collision(contact, geom1, geom2):
+   mask = (jnp.array([geom1, geom2]) == contact.geom).all(axis=1)
+   mask |= (jnp.array([geom2, geom1]) == contact.geom).all(axis=1)
+   return jnp.any(mask)
+
+def get_contacts(contact, ids):
+    left_foot = jnp.array([ 
+        check_collision(contact, ids["col"]["floor"], id)
+        for id in ids["col"]["left_foot"]])
+    right_foot = jnp.array([ 
+        check_collision(contact, ids["col"]["floor"], id)
+        for id in ids["col"]["right_foot"]])
+    
+    contact = jnp.array([jnp.any(left_foot), jnp.any(right_foot)])
+    return contact
+
 def get_collision_info(
     contact: Any, geom1: int, geom2: int
 ) -> Tuple[jax.Array, jax.Array]:
