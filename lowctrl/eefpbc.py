@@ -319,6 +319,9 @@ def step(mjx_model, state, act, ids):
      w, oriens, 
      base_acc, select) = ctrl2components(act, ids)
     
+    gnd_acc = gnd_acc * 0.0
+    base_acc = base_acc * 0.0
+    
     s = nn.sigmoid(w)
     
     qpos = state.qpos[ids["joint_pos_ids"]]
