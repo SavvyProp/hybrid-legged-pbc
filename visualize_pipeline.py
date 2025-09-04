@@ -50,7 +50,7 @@ def debug_eefpbc(act):
      base_acc, select) = ctrl2components(act, ids)
     print(w, tau_mix)
 
-dir = "training/test_6"
+dir = "training/test_pbc_1"
 
 model_path = dir + "/walk_policy"
 saved_params = model.load_params(model_path)
@@ -81,9 +81,10 @@ for c in range(1000):
     #nn_p, nn_d = raw_pd(raw_action)
     state = jit_step(state, ctrl)
     pipeline_state = state.data
-    print(state.data.contact)
+    #print(state.data.contact)
     print(state.info["last_contact"])
-    print(ids["col"])
+    debug_eefpbc(ctrl)
+    #print(ids["col"])
     #print(state.data.sensordata)
     #debug_eefpbc(ctrl)
     

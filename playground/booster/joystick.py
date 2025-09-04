@@ -33,7 +33,7 @@ from rewards.mjx_col import get_contacts
 def default_config() -> config_dict.ConfigDict:
   return config_dict.create(
       ctrl_dt=0.02,
-      sim_dt=0.002,
+      sim_dt=0.001,
       episode_length=1000,
       action_repeat=1,
       action_scale=1.0,
@@ -351,7 +351,7 @@ class Joystick(t1_base.T1Env):
     ])
     #contact = jp.hstack([jp.any(left_feet_contact), jp.any(right_feet_contact)])
     contact = get_contacts(data.contact, self.ids)
-    
+
     contact_filt = contact | state.info["last_contact"]
     first_contact = (state.info["feet_air_time"] > 0.0) * contact_filt
     state.info["feet_air_time"] += self.dt
