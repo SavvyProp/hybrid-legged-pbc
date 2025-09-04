@@ -86,8 +86,7 @@ def default_config() -> config_dict.ConfigDict:
               feet_distance=-1.0,
               collision=-1.0,
               pbc_w=-1.0,
-              tau_min=0.10,
-              pol_accs= -0.1
+              tau_min=0.10
           ),
           tracking_sigma=0.25,
           max_foot_height=0.12,
@@ -567,7 +566,6 @@ class Joystick(t1_base.T1Env):
         "feet_distance": self._cost_feet_distance(data, info),
         "pbc_w": self._cost_pbc_w(action, contact),
         "tau_min": self._cost_tau_min(action),
-        "pol_accs": self._cost_pol_accs(action),
     }
   
   def _cost_pol_accs(self, action):
