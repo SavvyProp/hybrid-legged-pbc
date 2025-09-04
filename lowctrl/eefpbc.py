@@ -177,74 +177,38 @@ def get_eef_acc(jvp,
     #eef_acc = eef_acc * 0.0
     return eef_acc
 
-def pbc_pinv(qpos, qvel, m_uc, h_uc, joint_traj, eef_acc, 
-        jacs, jvp, cons_stack, ids):
-    ju = jacs[:, :6]
-    jc = jacs[:, 6:]
+def iterative_ik(gnd_acc, base_acc, jacs, jvp, ids):
+    """
+    This simplified iterative ik solution only generates
+    the acceleration with no velocity error tracking
+    The task space is 24 dim eef, 2 dim head, 3 dim base orien
+    """
+    dt = 0.001
 
-    fac = 0.1
+    jac_base_ang = jnp.zeros([3, ids["ctrl_num"] + 6])
+    jac_base_ang = jac_base_ang.at[0, 3].set(1.0)
+    jac_base_ang = jac_base_ang.at[1, 4].set(1.0)
+    jac_base_ang = jac_base_ang.at[2, 5].set(1.0)
 
-    eef_num = ids["eef_num"]
-    ctrl_num = ids["ctrl_num"]
+    jac_dummy = jnp.zeros([2, ids["ctrl_num"] + 6])
+    jac_dummy = jac_dummy.at[0, ids["dummy_joints"][0]].set(1.0)
+    jac_dummy = jac_dummy.at[0, ids["dummy_joints"][1]].set(1.0)
 
-    def make_dsub(cons_m, ju, jc, m):
-        m_uu = m[:6, :6]
-        m_uc = m[:6, 6:]
-        m_cu = m[6:, :6]
-        m_cc = m[6:, 6:]
-        d11 = jnp.block([
-            [cons_m[:, :eef_num * 6], cons_m[:, eef_num * 6: eef_num * 6 + 6]]
-            [jnp.zeros([eef_num * 6, eef_num * 6]), ju],
-            [ju.T, m_uu]
-        ])
+    jac_task = jnp.vstack([jacs, jac_base_ang, jac_dummy])
 
-
-        d12 = jnp.block([
-            [cons_m[:, eef_num * 6 + 6:]],
-            [jc],
-            [m_uc]
-        ])
-
-        d21 = jnp.block([
-            [jc.T, m_cu]
-        ])
-
-        d22 = m_cc
-
-        return d11, d12, d21, d22
+    a_ik = jnp.concatenate([gnd_acc.reshape(-1), 
+                            base_acc[3:], jnp.zeros([2,])], axis = 0)
     
-    def make_hsub(cons_h, joint_a_cons, h_uc):
-        h1 = jnp.concatenate([
-            joint_a_cons + cons_h * fac, h_uc[:6]
-        ], axis = 0)
-        h2 = h_uc[6:]
-        return h1, h2
-    
-    joint_a_cons = jvp - eef_acc
-    
-    d11, d12, d21, d22 = make_dsub(cons_stack[0], ju, jc, m_uc)
+    jvp_task = jnp.concatenate([jvp, jnp.zeros([5,])], axis = 0)
 
-    h1, h2 = make_hsub(cons_stack[1], joint_a_cons, h_uc)
+    q_ddot_f = jnp.linalg.solve(jac_task, a_ik - jvp_task)
 
-    #bf_sub = jnp.vstack([jnp.zeros([6, ctrl_num]), jnp.eye(23)])
+    q_dot = q_ddot_f * dt
 
-    hbar = h2 - d21 @ jnp.linalg.solve(d11, h1)
-    b = -h1
-
-    lmbda = jnp.linalg.solve(d11, b)
-
-    ec_ik = qpos[7:] - joint_traj[0]
-    ec_ik_dot = qvel[6:] - joint_traj[1]
-
-    u_b_ff_grv = hbar
-
-    u_b_ff = u_b_ff_grv # + u_b_ff_acc * 1.0
-
-    u_b_fb = ids["p_gains"] * ec_ik # + ids["d_gains"] * ec_ik_dot
-    return u_b_ff, u_b_fb, lmbda
+    return (q_dot, q_ddot_f)
 
 
-def pbc(qpos, qvel, m_uc, h_uc, joint_traj, eef_acc, 
+def pbc(qpos, qvel, m_uc, h_uc, des_pos, dots, eef_acc, 
         jacs, jvp, cons_stack, ids):
     ju = jacs[:, :6]
     jc = jacs[:, 6:]
@@ -286,7 +250,7 @@ def pbc(qpos, qvel, m_uc, h_uc, joint_traj, eef_acc,
         h2 = h_uc[6:]
         return h1, h2
     
-    joint_a_cons = jvp - eef_acc
+    joint_a_cons = jvp - eef_acc.reshape(-1)
     
     d11, d12, d21, d22 = make_dsub(cons_stack[0], ju, jc, m_uc)
 
@@ -299,14 +263,14 @@ def pbc(qpos, qvel, m_uc, h_uc, joint_traj, eef_acc,
 
     lmbda = jnp.linalg.solve(d11, b)
 
-    ec_ik = qpos[7:] - joint_traj[0]
-    ec_ik_dot = qvel[6:] - joint_traj[1]
+    ec_ik = qpos[7:] - des_pos[0]
+    ec_ik_dot = qvel[6:] - dots[0]
 
     u_b_ff_grv = jnp.nan_to_num(hbar, posinf = 0.0, neginf = 0.0, nan = 0.0)
 
     u_b_ff = u_b_ff_grv # + u_b_ff_acc * 1.0
 
-    u_b_fb = ids["p_gains"] * ec_ik # + ids["d_gains"] * ec_ik_dot
+    u_b_fb = ids["p_gains"] * ec_ik + 0.1 * ids["d_gains"] * ec_ik_dot
     return u_b_ff, u_b_fb, lmbda
 
 def step(mjx_model, state, act, ids):
@@ -329,16 +293,14 @@ def step(mjx_model, state, act, ids):
 
     jvp = get_djp(mjx_model, state, ids)
 
-    joint_traj = get_joint_traj(qpos, des_pos, 0.1)
 
     cons_stack = qp_cons(m_uc[:6, :], h_uc[:6], qp_weights,
                          oriens, s, w, jacs[:, :6], ids)
     
-    eef_acc = get_eef_acc(jvp, 
-                          w, 
-                          gnd_acc, base_acc, select, ids)
     
-    u_b_ff, u_b_fb, lmbda = pbc(qpos, qvel, m_uc, h_uc, joint_traj, eef_acc, 
+    dots = iterative_ik(gnd_acc, base_acc, jacs, jvp, ids)
+    
+    u_b_ff, u_b_fb, lmbda = pbc(qpos, qvel, m_uc, h_uc, des_pos, dots, base_acc, 
                                jacs, jvp, cons_stack, ids)
     
     u = u_b_ff * tau_mix - u_b_fb

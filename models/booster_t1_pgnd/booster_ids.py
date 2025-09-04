@@ -130,6 +130,10 @@ right_col = [
 
 floor_col = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "floor")
 
+dummy_joints = [
+    0, 1
+]
+
 ids = {
     "joint_pos_ids": joint_pos_ids,
     "joint_vel_ids": joint_vel_ids,
@@ -147,5 +151,6 @@ ids = {
         "left_foot": left_col,
         "right_foot": right_col,
         "floor": floor_col
-    }
+    },
+    "dummy_joints": dummy_joints
 }
