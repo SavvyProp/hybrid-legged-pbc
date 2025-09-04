@@ -28,6 +28,7 @@ from mujoco_playground._src import mjx_env
 #from mujoco_playground._src.locomotion.t1 import base as t1_base
 from mujoco_playground._src.locomotion.t1 import t1_constants as consts
 from playground.booster import base_pd as t1_base
+from rewards.mjx_col import get_contacts
 
 def default_config() -> config_dict.ConfigDict:
   return config_dict.create(
@@ -295,7 +296,8 @@ class Joystick(t1_base.T1Env):
         data.sensordata[self._mj_model.sensor_adr[sensorid]] > 0
         for sensorid in self._right_foot_floor_found_sensor
     ])
-    contact = jp.hstack([jp.any(left_feet_contact), jp.any(right_feet_contact)])
+    #contact = jp.hstack([jp.any(left_feet_contact), jp.any(right_feet_contact)])
+    contact = get_contacts(data.contact, self.ids)
 
     obs = self._get_obs(data, info, contact)
     reward, done = jp.zeros(2)
@@ -347,7 +349,9 @@ class Joystick(t1_base.T1Env):
         data.sensordata[self._mj_model.sensor_adr[sensor_id]] > 0
         for sensor_id in self._right_foot_floor_found_sensor
     ])
-    contact = jp.hstack([jp.any(left_feet_contact), jp.any(right_feet_contact)])
+    #contact = jp.hstack([jp.any(left_feet_contact), jp.any(right_feet_contact)])
+    contact = get_contacts(data.contact, self.ids)
+    
     contact_filt = contact | state.info["last_contact"]
     first_contact = (state.info["feet_air_time"] > 0.0) * contact_filt
     state.info["feet_air_time"] += self.dt
