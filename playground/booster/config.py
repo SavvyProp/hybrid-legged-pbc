@@ -11,7 +11,7 @@ ppo_params.network_factory = config_dict.create(
         policy_obs_key="state",
         value_obs_key="privileged_state",
         distribution_type = "normal",
-        noise_std_type = "scalar"
+        noise_std_type = "log"
     )
 
 ppo_params.num_timesteps = 300_000_000
