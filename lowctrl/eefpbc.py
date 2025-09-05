@@ -175,75 +175,8 @@ def get_eef_acc(jvp,
 
     eef_acc = base_acc + acc_float
     #eef_acc = eef_acc * 0.0
-    #return eef_acc
-    return acc_float
-
-def pbc_pinv(qpos, qvel, m_uc, h_uc, joint_traj, eef_acc, 
-        jacs, jvp, cons_stack, ids):
-    ju = jacs[:, :6]
-    jc = jacs[:, 6:]
-
-    fac = 0.1
-
-    eef_num = ids["eef_num"]
-    ctrl_num = ids["ctrl_num"]
-
-    def make_dsub(cons_m, ju, jc, m):
-        m_uu = m[:6, :6]
-        m_uc = m[:6, 6:]
-        m_cu = m[6:, :6]
-        m_cc = m[6:, 6:]
-        d11 = jnp.block([
-            [cons_m[:, :eef_num * 6], cons_m[:, eef_num * 6: eef_num * 6 + 6]]
-            [jnp.zeros([eef_num * 6, eef_num * 6]), ju],
-            [ju.T, m_uu]
-        ])
-
-
-        d12 = jnp.block([
-            [cons_m[:, eef_num * 6 + 6:]],
-            [jc],
-            [m_uc]
-        ])
-
-        d21 = jnp.block([
-            [jc.T, m_cu]
-        ])
-
-        d22 = m_cc
-
-        return d11, d12, d21, d22
-    
-    def make_hsub(cons_h, joint_a_cons, h_uc):
-        h1 = jnp.concatenate([
-            joint_a_cons + cons_h * fac, h_uc[:6]
-        ], axis = 0)
-        h2 = h_uc[6:]
-        return h1, h2
-    
-    joint_a_cons = jvp - eef_acc
-    
-    d11, d12, d21, d22 = make_dsub(cons_stack[0], ju, jc, m_uc)
-
-    h1, h2 = make_hsub(cons_stack[1], joint_a_cons, h_uc)
-
-    #bf_sub = jnp.vstack([jnp.zeros([6, ctrl_num]), jnp.eye(23)])
-
-    hbar = h2 - d21 @ jnp.linalg.solve(d11, h1)
-    b = -h1
-
-    lmbda = jnp.linalg.solve(d11, b)
-
-    ec_ik = qpos[7:] - joint_traj[0]
-    ec_ik_dot = qvel[6:] - joint_traj[1]
-
-    u_b_ff_grv = hbar
-
-    u_b_ff = u_b_ff_grv # + u_b_ff_acc * 1.0
-
-    u_b_fb = ids["p_gains"] * ec_ik # + ids["d_gains"] * ec_ik_dot
-    return u_b_ff, u_b_fb, lmbda
-
+    return eef_acc
+    #return acc_float
 
 def pbc(qpos, qvel, m_uc, h_uc, joint_traj, eef_acc, 
         jacs, jvp, cons_stack, ids):
