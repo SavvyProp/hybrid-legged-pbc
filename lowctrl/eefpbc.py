@@ -174,8 +174,9 @@ def get_eef_acc(jvp,
     base_acc = jnp.tile(base_acc, [eef_num])
 
     eef_acc = base_acc + acc_float
-    eef_acc = eef_acc * 0.0
-    return eef_acc
+    #eef_acc = eef_acc * 0.0
+    #return eef_acc
+    return acc_float
 
 def pbc_pinv(qpos, qvel, m_uc, h_uc, joint_traj, eef_acc, 
         jacs, jvp, cons_stack, ids):

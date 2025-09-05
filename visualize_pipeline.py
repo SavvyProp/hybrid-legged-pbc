@@ -48,7 +48,7 @@ def debug_eefpbc(act):
      qp_weights, tau_mix, 
      w, oriens, 
      base_acc, select) = ctrl2components(act, ids)
-    print(w, tau_mix, gnd_acc)
+    print(w, select)
 
 dir = "training/test_pbc_4"
 
