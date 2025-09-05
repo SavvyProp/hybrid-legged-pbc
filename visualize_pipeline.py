@@ -50,7 +50,7 @@ def debug_eefpbc(act):
      base_acc, select) = ctrl2components(act, ids)
     print(w, tau_mix, gnd_acc)
 
-dir = "training/test_pbc_3"
+dir = "training/test_pbc_4"
 
 model_path = dir + "/walk_policy"
 saved_params = model.load_params(model_path)
