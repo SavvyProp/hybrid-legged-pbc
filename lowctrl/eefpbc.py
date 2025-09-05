@@ -341,7 +341,8 @@ def step(mjx_model, state, act, ids):
     u_b_ff, u_b_fb, lmbda = pbc(qpos, qvel, m_uc, h_uc, joint_traj, eef_acc, 
                                jacs, jvp, cons_stack, ids)
     
-    u = u_b_ff * tau_mix - u_b_fb
+    #u = u_b_ff * tau_mix - u_b_fb
+    u = u_b_ff - u_b_fb
     #u = u_b_ff
     #u = -u_b_fb
 
