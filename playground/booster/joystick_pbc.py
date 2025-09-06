@@ -64,7 +64,7 @@ def default_config() -> config_dict.ConfigDict:
               base_height=0.0,
               # Energy related rewards.
               torques=0.0,
-              action_rate=0.0,
+              action_rate=-0.01,
               energy=0.0,
               dof_acc=0.0,
               dof_vel=0.0,
@@ -625,7 +625,8 @@ class Joystick(t1_base.T1Env):
       self, act: jax.Array, last_act: jax.Array, last_last_act: jax.Array
   ) -> jax.Array:
     del last_last_act  # Unused.
-    c1 = jp.sum(jp.square(act - last_act))
+    c1 = jp.sum(jp.square(act[:self.ids["ctrl_num"]] - 
+                          last_act[:self.ids["ctrl_num"]]))
     return c1
 
   def _cost_dof_acc(self, qacc: jax.Array) -> jax.Array:

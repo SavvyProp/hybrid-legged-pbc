@@ -44,13 +44,13 @@ def makeIFN():
 
 def debug_eefpbc(act):
     from models.booster_t1_pgnd.booster_ids import ids
-    (des_pos, gnd_acc, 
-     qp_weights, tau_mix, 
+    (des_pos, 
+     qp_weights, 
      w, oriens, 
-     base_acc, select) = ctrl2components(act, ids)
-    print(w, select)
+    ) = ctrl2components(act, ids)
+    print(w)
 
-dir = "training/test_pbc_4"
+dir = "training/test_pbc_5"
 
 model_path = dir + "/walk_policy"
 saved_params = model.load_params(model_path)
