@@ -250,7 +250,9 @@ def ff_only(qpos, joint_traj, h_uc,
 
     u_b_fb = ids["p_gains"] * ec_ik
 
-    return h2 - F, u_b_fb
+    u_b_ff = jnp.nan_to_num(h2 - F, posinf = 0.0, neginf = 0.0, nan = 0.0)
+
+    return u_b_ff, u_b_fb
 
 def step(mjx_model, state, act, ids):
 
