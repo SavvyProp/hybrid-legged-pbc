@@ -86,7 +86,6 @@ def default_config() -> config_dict.ConfigDict:
               feet_distance=-1.0,
               collision=-1.0,
               pbc_w=-1.0,
-              tau_min=0.10
           ),
           tracking_sigma=0.25,
           max_foot_height=0.12,
@@ -565,36 +564,15 @@ class Joystick(t1_base.T1Env):
         "pose": self._cost_pose(data.qpos[7:]),
         "feet_distance": self._cost_feet_distance(data, info),
         "pbc_w": self._cost_pbc_w(action, contact),
-        "tau_min": self._cost_tau_min(action),
     }
   
-  def _cost_pol_accs(self, action):
-    (des_pos, gnd_acc, 
-     qp_weights, tau_mix, 
-     w, oriens, 
-     base_acc, select) = ctrl2components(action, self.ids)
-    #gnd_acc = jp.reshape(gnd_acc, (-1, 3))
-    #gnd_norm = jp.linalg.norm(gnd_acc, axis=-1)
-    #base_norm = jp.linalg.norm(base_acc)
-
-    #rew = jp.exp(-(jp.sum(gnd_norm) + base_norm) / 5.0)
-    #rew = (jp.sum(gnd_norm) + base_norm) / 5.0
-    rew = jp.sum(jp.square(gnd_acc)) + jp.sum(jp.square(base_acc))
-    return rew
 
   # Tracking rewards.
 
-  def _cost_tau_min(self, action):
-    (des_pos_logit, 
-         gnd_acc_logit, qp_weight_logit, tau_mix_logit, 
-         w, oriens_logit, base_acc, select) = ctrl2logits(action, self.ids)
-    #tau = jp.clip(tau_mix_logit, 0.0, 1.0)
-    return rewards.reward_tau_min(tau_mix_logit)
-
   def _cost_pbc_w(self, action, contact):
     (des_pos_logit, 
-         gnd_acc_logit, qp_weight_logit, tau_mix_logit, 
-         w, oriens_logit, base_acc, select) = ctrl2logits(action, self.ids)
+         qp_weight_logit, 
+         w, oriens_logit) = ctrl2logits(action, self.ids)
     return rewards.reward_pbc_w_leg_only(w, contact)
 
   def _reward_tracking_lin_vel(

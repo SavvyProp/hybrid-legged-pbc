@@ -130,29 +130,23 @@ def ctrl2logits(ctrl, ids):
     jnt_num = ids["ctrl_num"]
     eef_num = ids["eef_num"]
     des_pos_logit = ctrl[:jnt_num]
-    gnd_acc_logit = ctrl[jnt_num:jnt_num + eef_num * 6]
-    qp_weight_logit = ctrl[jnt_num + eef_num * 6:jnt_num + eef_num * 6 + 2]
-    tau_mix_logit = ctrl[jnt_num + eef_num * 6 + 2: 2 * jnt_num + eef_num * 6 + 2]
-    w = ctrl[2 * jnt_num + eef_num * 6 + 2: 2 * jnt_num + eef_num * 7 + 2]
-    oriens = ctrl[2 * jnt_num + eef_num * 7 + 2: 2 * jnt_num + eef_num * 10 + 2]
-    base_acc = ctrl[2 * jnt_num + eef_num * 10 + 2: 2 * jnt_num + eef_num * 10 + 8]
-    select = ctrl[-1]
-    return des_pos_logit, gnd_acc_logit, qp_weight_logit, tau_mix_logit, w, oriens, base_acc, select
+    qp_weight_logit = ctrl[jnt_num :jnt_num + 2]
+    w = ctrl[jnt_num + 2: jnt_num + eef_num + 2]
+    oriens = ctrl[jnt_num + eef_num + 2: jnt_num + eef_num * 4 + 2]
+    
+    return des_pos_logit, qp_weight_logit, w, oriens
 
 def ctrl2components(ctrl, ids):
     (des_pos_logit, 
-     gnd_acc_logit, qp_weight_logit, tau_mix_logit, 
-     w, oriens_logit, base_acc, select) = ctrl2logits(ctrl, ids)
+     qp_weight_logit, 
+     w, oriens_logit) = ctrl2logits(ctrl, ids)
     des_pos = lpd.logit2limit(des_pos_logit, ids)
     #des_pos = des_pos_logit
-    gnd_acc = logit2gndacc(gnd_acc_logit, ids)
-    base_acc = jnp.tanh(base_acc) * 10.0
     qp_weights = nn.sigmoid(qp_weight_logit)
-    tau_mix = nn.sigmoid(tau_mix_logit)
     oriens_logit = jnp.reshape(oriens_logit, [ids["eef_num"], 3])
     eps = 1e-6
     oriens = oriens_logit / (jnp.linalg.norm(oriens_logit, axis=1, keepdims=True) + eps)
-    return des_pos, gnd_acc, qp_weights, tau_mix, w, oriens, base_acc, nn.sigmoid(select)
+    return des_pos, qp_weights, w, oriens
 
 def get_joint_traj(qpos, des_pos, T):
     qpos_c = qpos[7:]
@@ -243,8 +237,8 @@ def pbc(qpos, qvel, m_uc, h_uc, joint_traj, eef_acc,
     u_b_fb = ids["p_gains"] * ec_ik # + ids["d_gains"] * ec_ik_dot
     return u_b_ff, u_b_fb, lmbda
 
-def ff_only(h_uc, 
-        jacs, cons_stack):
+def ff_only(qpos, joint_traj, h_uc, 
+        jacs, cons_stack, ids):
     
     h2 = h_uc[6:]
 
@@ -252,45 +246,37 @@ def ff_only(h_uc,
 
     F = jc.T @ cons_stack[1]
 
-    return h2 - F
+    ec_ik = qpos[7:] - joint_traj[0]
+
+    u_b_fb = ids["p_gains"] * ec_ik
+
+    return h2 - F, u_b_fb
 
 def step(mjx_model, state, act, ids):
 
     jacs = jac_stack(mjx_model, state, ids)
     m_uc, h_uc = get_mh(mjx_model, state, ids)
 
-    (des_pos, gnd_acc, 
-     qp_weights, tau_mix, 
+    (des_pos, 
+     qp_weights, 
      w, oriens, 
-     base_acc, select) = ctrl2components(act, ids)
-    
-    gnd_acc = gnd_acc * 0.0
-    base_acc = base_acc * 0.0
+     ) = ctrl2components(act, ids)
     
     s = nn.sigmoid(w)
     
     qpos = state.qpos[ids["joint_pos_ids"]]
-    qvel = state.qvel[ids["joint_vel_ids"]]
-
-    jvp = get_djp(mjx_model, state, ids)
 
     joint_traj = get_joint_traj(qpos, des_pos, 0.1)
 
     cons_stack = qp_cons(m_uc[:6, :], h_uc[:6], qp_weights,
                          oriens, s, w, jacs[:, :6], ids)
     
-    eef_acc = get_eef_acc(jvp, 
-                          w, 
-                          gnd_acc, base_acc, select, ids)
-    
-    u_b_ff, u_b_fb, lmbda = pbc(qpos, qvel, m_uc, h_uc, joint_traj, eef_acc, 
-                               jacs, jvp, cons_stack, ids)
-    
-    u_b_ff2 = ff_only(h_uc, jacs, cons_stack)
+    u_b_ff2, u_b_fb = ff_only(qpos, joint_traj, h_uc, 
+        jacs, cons_stack, ids)
 
-    #u = u_b_ff * tau_mix - u_b_fb
+    u = u_b_ff2 - u_b_fb
     #u = u_b_ff - u_b_fb
-    u = u_b_ff2
+    #u = u_b_ff2
     #u = -u_b_fb
 
     #f_stc = lmbda[: ids["eef_num"] * 6]
@@ -301,13 +287,9 @@ def step(mjx_model, state, act, ids):
 
     return u
 
-
-
 def default_act(ids):
 	pos = ids["default_qpos"][7:]
-	gnd_acc = jnp.zeros((ids["eef_num"], 6))
 	qp_weights = jnp.array([4, 4])
-	tau_mix = jnp.ones([ids["ctrl_num"]]) * 5.0
 	w = jnp.array([10., 10., -5., -5.])
 	target_orien = jnp.array([
        [0., 0., 1.],
@@ -315,14 +297,8 @@ def default_act(ids):
        [0., 0., 1.],
 	   [0., 0., 1.]
     ]).flatten()
-	base_acc = jnp.zeros([6,])
-	select = jnp.array([-10.0])
 	act = jnp.concatenate([pos, 
-                           jnp.reshape(gnd_acc, (-1,)), 
                            qp_weights, 
-                           tau_mix, 
                            w, 
-                           target_orien, 
-                           base_acc,
-                           select])
+                           target_orien])
 	return act
