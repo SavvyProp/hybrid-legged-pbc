@@ -173,9 +173,9 @@ def get_eef_acc(jvp,
     base_acc = select_acc * select + base_acc * (1 - select)
     base_acc = jnp.tile(base_acc, [eef_num])
 
-    eef_acc = base_acc + acc_float
+    #eef_acc = base_acc + acc_float
     #eef_acc = eef_acc * 0.0
-    return eef_acc
+    return jvp
     #return acc_float
 
 def pbc(qpos, qvel, m_uc, h_uc, joint_traj, eef_acc, 
@@ -183,7 +183,7 @@ def pbc(qpos, qvel, m_uc, h_uc, joint_traj, eef_acc,
     ju = jacs[:, :6]
     jc = jacs[:, 6:]
 
-    fac = 0.1
+    fac = 10.0
 
     eef_num = ids["eef_num"]
     ctrl_num = ids["ctrl_num"]
@@ -243,6 +243,17 @@ def pbc(qpos, qvel, m_uc, h_uc, joint_traj, eef_acc,
     u_b_fb = ids["p_gains"] * ec_ik # + ids["d_gains"] * ec_ik_dot
     return u_b_ff, u_b_fb, lmbda
 
+def ff_only(h_uc, 
+        jacs, cons_stack):
+    
+    h2 = h_uc[6:]
+
+    jc = jacs[:, 6:]
+
+    F = jc.T @ cons_stack[1]
+
+    return h2 - F
+
 def step(mjx_model, state, act, ids):
 
     jacs = jac_stack(mjx_model, state, ids)
@@ -275,9 +286,11 @@ def step(mjx_model, state, act, ids):
     u_b_ff, u_b_fb, lmbda = pbc(qpos, qvel, m_uc, h_uc, joint_traj, eef_acc, 
                                jacs, jvp, cons_stack, ids)
     
+    u_b_ff2 = ff_only(h_uc, jacs, cons_stack)
+
     #u = u_b_ff * tau_mix - u_b_fb
-    u = u_b_ff - u_b_fb
-    #u = u_b_ff
+    #u = u_b_ff - u_b_fb
+    u = u_b_ff2
     #u = -u_b_fb
 
     #f_stc = lmbda[: ids["eef_num"] * 6]

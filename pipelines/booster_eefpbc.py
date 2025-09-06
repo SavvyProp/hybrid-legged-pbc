@@ -122,7 +122,7 @@ def step(
 		unused_debug: bool = False,
 		ids = bids
 ) -> State:
-	ctrl, state = eefpbc.step(sys, state, act, ids)
+	ctrl = eefpbc.step(sys, state, act, ids)
 	data = state.replace(ctrl=ctrl)
 	data = mjx.step(sys, data)
 	q, qd = data.qpos, data.qvel
