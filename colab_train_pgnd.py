@@ -1,8 +1,7 @@
 #from playground.booster import joystick
 from playground.booster import joystick_pbc as joystick
-
-from mujoco_playground.config import locomotion_params
 from playground.booster.randomize import domain_randomize
+from mujoco_playground.config import locomotion_params
 from datetime import datetime
 import functools
 import matplotlib.pyplot as plt
@@ -47,7 +46,8 @@ def make_trainfn():
     train_fn = functools.partial(
         ppo.train, **dict(ppo_training_params),
         network_factory=network_factory,
-        progress_fn=progress
+        progress_fn=progress,
+        randomization_fn = domain_randomize
     )
 
     return train_fn, env, wrapper.wrap_for_brax_training
