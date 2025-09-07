@@ -8,11 +8,12 @@ import matplotlib.pyplot as plt
 from brax.training.agents.ppo import networks as ppo_networks
 from brax.training.agents.ppo import train as ppo
 from mujoco_playground import wrapper
-
+from mujoco_playground import registry
 env = joystick.Joystick()
 env_cfg = joystick.default_config()
 env_name = "T1JoystickFlatTerrain"
-
+#env = registry.load(env_name)
+#domain_randomize = registry.get_domain_randomizer(env_name)
 from playground.booster.config import ppo_params
 ppo_training_params = dict(ppo_params)
 
@@ -47,7 +48,8 @@ if "network_factory" in ppo_params:
 train_fn = functools.partial(
     ppo.train, **dict(ppo_training_params),
     network_factory=network_factory,
-    progress_fn=progress
+    progress_fn=progress,
+    randomization_fn = domain_randomize
 )
 
 make_inference_fn, params, metrics = train_fn(

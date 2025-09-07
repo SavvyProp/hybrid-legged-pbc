@@ -69,9 +69,6 @@ def domain_randomize(model: mjx.Model, rng: jax.Array):
 
     # Joint stiffness: *U(0.9, 1.1).
     rng, key = jax.random.split(rng)
-    kp = model.actuator_gainprm[:, 0] * jax.random.uniform(
-        key, (model.nu,), minval=0.9, maxval=1.1
-    )
 
     # Higher range on the ankles.
     rng, key = jax.random.split(rng)
