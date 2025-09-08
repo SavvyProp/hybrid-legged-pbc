@@ -9,18 +9,20 @@ from brax.training.agents.ppo import networks as ppo_networks
 from brax.training.agents.ppo import train as ppo
 from mujoco_playground import wrapper
 from mujoco_playground import registry
-env = joystick.Joystick()
 env_cfg = joystick.default_config()
+env = joystick.Joystick()
+eval_env = joystick.Joystick()
 env_name = "T1JoystickFlatTerrain"
 #env = registry.load(env_name)
-#domain_randomize = registry.get_domain_randomizer(env_name)
-from playground.booster.config import ppo_params
+#eval_env = registry.load(env_name, config=env_cfg)
+domain_randomize = registry.get_domain_randomizer(env_name)
+#from playground.booster.config import ppo_params
+ppo_params = locomotion_params.brax_ppo_config(env_name)
 ppo_training_params = dict(ppo_params)
 
 
 x_data, y_data, y_dataerr = [], [], []
 times = [datetime.now()]
-
 
 def progress(num_steps, metrics):
 
@@ -48,13 +50,14 @@ if "network_factory" in ppo_params:
 train_fn = functools.partial(
     ppo.train, **dict(ppo_training_params),
     network_factory=network_factory,
+    randomization_fn = domain_randomize,
     progress_fn=progress,
-    randomization_fn = domain_randomize
 )
 
 make_inference_fn, params, metrics = train_fn(
     environment=env,
-    eval_env=env,
+    #eval_env=env,
+    eval_env = eval_env,
     wrap_env_fn=wrapper.wrap_for_brax_training,
 )
 print(f"time to jit: {times[1] - times[0]}")

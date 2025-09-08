@@ -11,6 +11,7 @@ from mujoco_playground import wrapper
 
 def make_trainfn():
     env = joystick.Joystick()
+    eval_env = joystick.Joystick()
     env_cfg = joystick.default_config()
     from playground.booster.config import ppo_params
     env_name = "T1JoystickFlatTerrain"
@@ -50,4 +51,4 @@ def make_trainfn():
         randomization_fn = domain_randomize
     )
 
-    return train_fn, env, wrapper.wrap_for_brax_training
+    return train_fn, env, eval_env, wrapper.wrap_for_brax_training
