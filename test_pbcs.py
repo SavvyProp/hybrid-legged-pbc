@@ -16,7 +16,7 @@ from brax.training.acme import running_statistics
 #from playground.booster import joystick
 from playground.booster import joystick_pbc as joystick
 from playground.booster.config import ppo_params
-from lowctrl.eefpbc import ctrl2components
+from lowctrl.eefpbc import ctrl2components, test_pbcs
 from models.booster_t1_pgnd.booster_ids import ids
 env = joystick.Joystick()
 
@@ -50,7 +50,7 @@ def debug_eefpbc(act):
     ) = ctrl2components(act, ids)
     print(w)
 
-dir = "training/test_pd_2"
+dir = "training/test_pbc_8"
 
 model_path = dir + "/walk_policy"
 saved_params = model.load_params(model_path)
@@ -72,44 +72,27 @@ obs_list = []
 nn_p_list = []
 states = []
 
+base_tau = np.zeros([1000, 23])
+inv_tau = np.zeros([1000, 23])
+pinv_tau = np.zeros([1000, 23])
+
 for c in range(1000):
     act_rng, rng = jax.random.split(rng)
     obs_list += [state.obs]
     ctrl, _ = jit_inference_fn(state.obs, act_rng)
-    
-    #raw_action = ctrl[2 * HIDDEN_SIZE * DEPTH:]
-    #nn_p, nn_d = raw_pd(raw_action)
+    base, inv, pinv = test_pbcs(env._mjx_model, state.data, ctrl)
+    base_tau[c, :] = np.array(base)
+    inv_tau[c, :] = np.array(inv)
+    pinv_tau[c, :] = np.array(pinv)
     state = jit_step(state, ctrl)
     pipeline_state = state.data
-    #print(state.data.contact)
-    print(state.info["last_contact"])
-    debug_eefpbc(ctrl)
-    #print(ids["col"])
-    #print(state.data.sensordata)
-    #debug_eefpbc(ctrl)
-    
-    #nn_p_list += [nn_p]
-    #nn_p_list += [nn_p]
     ctrl_list += [ctrl]
     states += [state]
     pipeline_state_list += [pipeline_state]
 
+np.savetxt("data/base_tau.csv", base_tau, delimiter=",")
+np.savetxt("data/inv_tau.csv", inv_tau, delimiter=",")
+np.savetxt("data/pinv_tau.csv", pinv_tau, delimiter=",")
+
 
 print("Rollout precomputed")
-
-viewer = mujoco.viewer.launch_passive(mj_model, data)
-import time
-while True:
-    for c1 in range(1000):
-        #print("=========================")
-        #print(ctrl_list[c1])
-        #print(nn_p_list[c1])
-        #print(obs_list[c1])
-        pipeline_state = pipeline_state_list[c1]
-        state = states[c1]
-        #print(state.info["phase"])
-        #print(state.metrics)
-        time.sleep(0.02)
-        mjx.get_data_into(data, mj_model, pipeline_state)
-        viewer.sync()
-viewer.close()

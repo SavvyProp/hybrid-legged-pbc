@@ -172,12 +172,12 @@ def get_eef_acc(jvp,
     return jvp
     #return acc_float
 
-def pbc(qpos, qvel, m_uc, h_uc, joint_traj, eef_acc, 
-        jacs, jvp, cons_stack, ids):
+def pbc(qpos, m_uc, h_uc, des_pos, eef_acc, 
+        jacs, jvp, cons_stack, ids, pinv = False):
     ju = jacs[:, :6]
     jc = jacs[:, 6:]
 
-    fac = 10.0
+    fac = 0.1
 
     eef_num = ids["eef_num"]
     ctrl_num = ids["ctrl_num"]
@@ -187,17 +187,27 @@ def pbc(qpos, qvel, m_uc, h_uc, joint_traj, eef_acc,
         m_uc = m[:6, 6:]
         m_cu = m[6:, :6]
         m_cc = m[6:, 6:]
-        d11 = jnp.block([
-            [cons_m[:, :eef_num * 6] * fac, 
-             ju + cons_m[:, eef_num * 6: eef_num * 6 + 6] * fac],
-            [ju.T, m_uu]
-        ])
-
-
-        d12 = jnp.block([
-            [jc + cons_m[:, eef_num * 6 + 6:] * fac],
-            [m_uc]
-        ])
+        if pinv:
+            d11 = jnp.block([ [cons_m[:, :eef_num*6+6]],
+                [jnp.zeros([6 * eef_num, 6 * eef_num]), 
+                ju],
+                [ju.T, m_uu]
+            ])
+            d12 = jnp.block([
+                [cons_m[:, eef_num * 6 + 6:]],
+                [jc],
+                [m_uc]
+            ])
+        else:
+            d11 = jnp.block([
+                [cons_m[:, :eef_num * 6] * fac, 
+                ju + cons_m[:, eef_num * 6: eef_num * 6 + 6] * fac],
+                [ju.T, m_uu]
+            ])
+            d12 = jnp.block([
+                [jc + cons_m[:, eef_num * 6 + 6:] * fac],
+                [m_uc]
+            ])
 
         d21 = jnp.block([
             [jc.T, m_cu]
@@ -208,36 +218,41 @@ def pbc(qpos, qvel, m_uc, h_uc, joint_traj, eef_acc,
         return d11, d12, d21, d22
     
     def make_hsub(cons_h, joint_a_cons, h_uc):
-        h1 = jnp.concatenate([
-            joint_a_cons + cons_h * fac, h_uc[:6]
-        ], axis = 0)
+        if pinv:
+            h1 = jnp.concatenate([
+                cons_h, joint_a_cons, h_uc[:6]
+            ], axis = 0)
+        else:
+            h1 = jnp.concatenate([
+                joint_a_cons + cons_h * fac, h_uc[:6]
+            ], axis = 0)
         h2 = h_uc[6:]
         return h1, h2
     
     joint_a_cons = jvp - eef_acc
-    
     d11, d12, d21, d22 = make_dsub(cons_stack[0], ju, jc, m_uc)
 
     h1, h2 = make_hsub(cons_stack[1], joint_a_cons, h_uc)
 
     #bf_sub = jnp.vstack([jnp.zeros([6, ctrl_num]), jnp.eye(23)])
+    if pinv:
+        hbar = h2 - d21 @ jnp.linalg.pinv(d11) @ h1
+    else:
+        hbar = h2 - d21 @ jnp.linalg.solve(d11, h1)
+    
 
-    hbar = h2 - d21 @ jnp.linalg.solve(d11, h1)
-    b = -h1
+    #lmbda = jnp.linalg.solve(d11, b)
 
-    lmbda = jnp.linalg.solve(d11, b)
-
-    ec_ik = qpos[7:] - joint_traj[0]
-    ec_ik_dot = qvel[6:] - joint_traj[1]
+    ec_ik = qpos[7:] - des_pos[0]
 
     u_b_ff_grv = jnp.nan_to_num(hbar, posinf = 0.0, neginf = 0.0, nan = 0.0)
 
     u_b_ff = u_b_ff_grv # + u_b_ff_acc * 1.0
 
     u_b_fb = ids["p_gains"] * ec_ik # + ids["d_gains"] * ec_ik_dot
-    return u_b_ff, u_b_fb, lmbda
+    return u_b_ff, u_b_fb
 
-def ff_only(qpos, joint_traj, h_uc, 
+def ff_only(qpos, des_pos, h_uc, 
         jacs, cons_stack, ids):
     
     h2 = h_uc[6:]
@@ -246,7 +261,7 @@ def ff_only(qpos, joint_traj, h_uc,
 
     F = jc.T @ cons_stack[1]
 
-    ec_ik = qpos[7:] - joint_traj[0]
+    ec_ik = qpos[7:] - des_pos
 
     u_b_fb = ids["p_gains"] * ec_ik
 
@@ -268,12 +283,11 @@ def step(mjx_model, state, act, ids):
     
     qpos = state.qpos[ids["joint_pos_ids"]]
 
-    joint_traj = get_joint_traj(qpos, des_pos, 0.1)
 
     cons_stack = qp_cons(m_uc[:6, :], h_uc[:6], qp_weights,
                          oriens, s, w, jacs[:, :6], ids)
     
-    u_b_ff2, u_b_fb = ff_only(qpos, joint_traj, h_uc, 
+    u_b_ff2, u_b_fb = ff_only(qpos, des_pos, h_uc, 
         jacs, cons_stack, ids)
 
     u = u_b_ff2 - u_b_fb
@@ -288,6 +302,45 @@ def step(mjx_model, state, act, ids):
     u = jnp.clip(u, -tau_limits, tau_limits)
 
     return u
+
+from models.booster_t1_pgnd.booster_ids import ids as bids
+#@jax.jit
+from functools import partial
+@partial(jax.jit, static_argnames = ('ids',))
+def test_pbcs(mjx_model, state, act, ids = bids):
+    jacs = jac_stack(mjx_model, state, ids)
+    jvp = get_djp(mjx_model, state, ids)
+    m_uc, h_uc = get_mh(mjx_model, state, ids)
+
+    (des_pos, 
+     qp_weights, 
+     w, oriens, 
+     ) = ctrl2components(act, ids)
+    
+    s = nn.sigmoid(w)
+    
+    qpos = state.qpos[ids["joint_pos_ids"]]
+    #qvel = state.qvel[ids["joint_vel_ids"]]
+
+    cons_stack = qp_cons(m_uc[:6, :], h_uc[:6], qp_weights,
+                         oriens, s, w, jacs[:, :6], ids)
+    
+    u_b_ff, _ = ff_only(qpos, des_pos, h_uc, 
+        jacs, cons_stack, ids)
+    
+    #eef_acc = jnp.zeros([ids["eef_num"] * 6])
+    eef_acc = jvp
+    
+    u_b_ff_inv, _ = pbc(qpos, m_uc, h_uc,
+                        des_pos, eef_acc, jacs, jvp,
+                        cons_stack, ids, pinv = False)
+    
+    u_b_ff_pinv, _ = pbc(qpos, m_uc, h_uc,
+                        des_pos, eef_acc, jacs, jvp,
+                        cons_stack, ids, pinv = True)
+    
+    return u_b_ff, u_b_ff_inv, u_b_ff_pinv
+
 
 def default_act(ids):
 	pos = ids["default_qpos"][7:]
