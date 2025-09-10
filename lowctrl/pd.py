@@ -31,4 +31,4 @@ def step(mjx_model, state, act, ids):
 
     tau_limits = ids["tau_limits"]
     u = jnp.clip(u, -tau_limits, tau_limits)
-    return u, state
+    return u
