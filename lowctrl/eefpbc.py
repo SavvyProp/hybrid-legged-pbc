@@ -229,7 +229,7 @@ def pbc(qpos, m_uc, h_uc, des_pos, eef_acc,
     h1, h2 = make_hsub(joint_a_cons, h_uc - h_frc)
     #bf_sub = jnp.vstack([jnp.zeros([6, ctrl_num]), jnp.eye(23)])
     
-    hbar = h2 # - d21 @ jnp.linalg.solve(d11, h1)
+    hbar = h2 - d21 @ jnp.linalg.solve(d11, h1)
     #lmbda = jnp.linalg.solve(d11, b)
 
     ec_ik = qpos[7:] - des_pos[0]

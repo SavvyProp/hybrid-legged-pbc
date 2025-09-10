@@ -26,6 +26,8 @@ times = [datetime.now()]
 
 def progress(num_steps, metrics):
 
+  print(f"steps: {num_steps}, reward: {metrics['eval/episode_reward']}")
+
   times.append(datetime.now())
   x_data.append(num_steps)
   y_data.append(metrics["eval/episode_reward"])
@@ -36,7 +38,8 @@ def progress(num_steps, metrics):
   plt.ylabel("reward per episode")
   plt.title(f"y={y_data[-1]:.3f}")
   plt.errorbar(x_data, y_data, yerr=y_dataerr, color="blue")
-  plt.show()
+  plt.savefig("plot/progress{}.png".format(num_steps))
+  plt.clf()
 
 
 network_factory = ppo_networks.make_ppo_networks
