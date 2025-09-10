@@ -45,7 +45,8 @@ def qp_cons(m_u_uc, h_u, qp_weights,
     y = sol2 @ m_u_uc
     z = sol2 @ h_u
 
-    cons_d = jnp.concatenate([jnp.eye(6 * ids["eef_num"]), y], axis = 1)
+    #cons_d = jnp.concatenate([jnp.eye(6 * ids["eef_num"]), y], axis = 1)
+    cons_d = y
     cons_h = z
 
     return cons_d, cons_h
