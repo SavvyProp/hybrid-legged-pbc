@@ -65,3 +65,5 @@ make_inference_fn, params, metrics = train_fn(
 )
 print(f"time to jit: {times[1] - times[0]}")
 print(f"time to train: {times[-1] - times[1]}")
+from brax.io import model
+model.save_params("walk_policy", params)
