@@ -29,6 +29,7 @@ from mujoco_playground._src import mjx_env
 from mujoco_playground._src.locomotion.t1 import t1_constants as consts
 from playground.booster import base_pd as t1_base
 from rewards.mjx_col import get_contacts
+from playground.booster.base_pd import step
 
 def default_config() -> config_dict.ConfigDict:
   return config_dict.create(
@@ -327,7 +328,7 @@ class Joystick(t1_base.T1Env):
     # state = self._reset_if_outside_bounds(state)
 
     motor_targets = action #self._default_pose + action * self._config.action_scale
-    data = mjx_env.step(
+    data = step(
         self.mjx_model, state.data, motor_targets, self.n_substeps
     )
     state.info["motor_targets"] = motor_targets
