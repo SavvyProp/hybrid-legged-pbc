@@ -15,7 +15,6 @@ def logit2vel(logit):
     max_vel = 10.0
     return jnp.tanh(logit) * max_vel
 
-@jax.jit
 def step(mjx_model, state, act, ids):
     nn_p_logit = act[:ids["ctrl_num"]]
     des_pos = logit2limit(nn_p_logit, ids)
