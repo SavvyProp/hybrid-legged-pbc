@@ -3,7 +3,7 @@ from mujoco import mjx
 import jax
 import lowctrl.math as lmath
 import lowctrl.pd as lpd
-from lowctrl.qp_cons import qp_cons
+from lowctrl.qp_cons import qp_solve
 from flax import linen as nn
 
 def get_jac(mjx_model, mjx_data, site_name, ids):
@@ -260,7 +260,7 @@ def ff_only(qpos, des_pos, h_uc,
 
     return u_b_ff, u_b_fb
 
-def step(mjx_model, state, act, ids):
+def step(mjx_model, state, act, ids, override_pos = None):
 
     jacs = jac_stack(mjx_model, state, ids)
     jvp = get_djp(mjx_model, state, ids)
@@ -271,32 +271,35 @@ def step(mjx_model, state, act, ids):
      w, oriens, 
      ) = ctrl2components(act, ids)
     
-    s = nn.sigmoid(w)
+    if override_pos is not None:
+        des_pos = override_pos
     
     qpos = state.qpos[ids["joint_pos_ids"]]
 
-
-    cons_stack = qp_cons(m_uc[:6, :], h_uc[:6], qp_weights,
-                         oriens, s, w, jacs[:, :6], ids)
+    qacc_gain = 400.0
+    qc = qacc_gain * (des_pos - qpos[7:])
     
-    eef_acc = jnp.zeros([6])
+    qc0 = jnp.zeros_like(qc)
+    eef_acc = jnp.zeros([6 * ids["eef_num"]])
 
-    u_b_ff, u_b_fb = pbc(qpos, m_uc, h_uc, des_pos, eef_acc,
-                            jacs, jvp, 
-                            cons_stack, w, ids)
+    f, q_u = qp_solve(m_uc, h_uc, 
+                qp_weights, oriens, w, 
+                jacs, jvp, 
+                eef_acc, qc0,
+                ids)
     
-    #u_b_ff, u_b_fb = ff_only(qpos, des_pos, h_uc,
-    #                        jacs, cons_stack, ids)
+    h_c = h_uc[6:]
+    j_c = jacs[:, 6:]
+    m_cu = m_uc[6:, :6]
+    m_cc = m_uc[6:, 6:]
+    u_b_ff = -j_c.T @ f + m_cu @ q_u + h_c
+    #u_b_fb = m_cc @ qc
+    ec_ik = qpos[7:] - des_pos
+
+    u_b_fb = ids["p_gains"] * ec_ik
+
+    u = u_b_ff + u_b_fb
     
-    u = u_b_ff - u_b_fb
-    #u = u_b_ff
-    #u = u_b_ff - u_b_fb
-    #u = u_b_ff2
-    #u = -u_b_fb
-
-    #f_stc = lmbda[: ids["eef_num"] * 6]
-
-    #state = state.replace(f_stc = f_stc)
     tau_limits = ids["tau_limits"]
     u = jnp.clip(u, -tau_limits, tau_limits)
     return u

@@ -73,7 +73,6 @@ for jnt_name in joint_names:
 joint_pos_ids = jnp.array(joint_pos_ids)
 joint_vel_ids = jnp.array(joint_vel_ids)
 
-
 def load_gains():
     """
     Load gains from digit_gains.yaml and return organized gain arrays.

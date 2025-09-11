@@ -27,30 +27,17 @@ state = init(
     jnp.zeros([0,]),
     ctrl,
 )
-t = 0
-@jax.jit
-def step_fn(mjx_model, mjx_state, t):
+
+def step_fn(mjx_model, mjx_state):
     act = default_act(bids.ids)
     pos = bids.ids["default_qpos"][7:]
-    pos = pos.at[2].set(jnp.sin(t) * 0.4)
-    pos = pos.at[6].set(jnp.sin(t) * 0.4)
     ctrl = eefpbc.step(mjx_model, mjx_state, act, bids.ids, override_pos = pos)
     data = mjx_state.replace(ctrl=ctrl)
     data = mjx.step(mjx_model, data)
     return data
 
 
-viewer = mujoco.viewer.launch_passive(model, data)
 for c in range(5000):
     print("step {}".format(c))
-    #mujoco.mj_step(model, data)
-    state = step_fn(mjx_model, state, t)
-    #m_uc, h_uc = eefpbc.get_mh(mjx_model, state, bids.ids)
-    #print(m_uc)
-    #if (c % 100) == 0:
-    #    np.savetxt("data/debug.csv", state.debug, delimiter=",")
-    t += 0.001
-    mjx.get_data_into(data, model, state)
-    viewer.sync()
-
-viewer.close()
+    state = step_fn(mjx_model, state)
+    

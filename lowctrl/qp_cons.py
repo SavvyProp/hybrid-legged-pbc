@@ -1,5 +1,6 @@
 import jax.numpy as jnp
 import numpy as np
+import flax.linen as nn
 
 EEF_NUM = 4
 
@@ -29,6 +30,69 @@ def make_omega(w, ids):
     weights = jnp.exp(-1 * w)
     omega = vec2diags(weights, ids)
     return omega
+
+
+def make_acc_cons(w, ju, lstsq_opt, ids):
+    omega = make_omega(w, ids)
+    ju = omega @ ju
+    lstsq_opt = omega @ lstsq_opt
+    big_q_a = 2 * ju.T @ ju
+    big_q_a += jnp.eye(6) * 1e-6
+    small_q_a = 2 * ju.T @ lstsq_opt
+    return big_q_a, small_q_a
+
+def qp_solve(m, h, 
+            qp_weights, oriens, w, 
+            jacs, jvp, 
+            a_stc, qc,
+            ids,
+            ):
+    s = nn.sigmoid(w)
+    theta = make_theta(oriens, s, ids)
+    omega = make_omega(w, ids)
+    q_frc = theta * qp_weights[0] + omega * qp_weights[1]
+
+    ju = jacs[:, :6]
+    jc = jacs[:, 6:]
+    lstsq_opt = a_stc - jvp - jc @ qc
+
+    big_q_a, small_q_a = make_acc_cons(w, ju, lstsq_opt, ids)
+    #r_a = lstsq_opt[None, :] @ lstsq_opt[:, None]
+
+    # Stack is q on top followed by f
+
+    f_size = ids["eef_num"] * 6
+
+    big_q = jnp.block([[big_q_a, jnp.zeros([6, f_size])],
+                       [jnp.zeros([f_size, 6]), q_frc]])
+    small_q = jnp.concatenate([small_q_a, jnp.zeros([f_size])], axis = 0)
+
+    # Setup constraints
+    i_q = jnp.concatenate([jnp.eye(6), jnp.zeros([6, f_size])], axis = 1)
+    i_frc = jnp.concatenate([jnp.zeros([f_size, 6]), jnp.eye(f_size)], axis = 1)
+
+    #Cons: -juT @ F + m_uu @ q_u + muc @ q_c + h_u = 0
+    # juT @ I_f @ F - m_uu @ I_q @ q_u = h_u + muc @ q_c
+    h_u = h[:6]
+    m_uu = m[:6, :6]
+    m_uc = m[:6, 6:]
+    cons_a = ju.T @ i_frc - m_uu @ i_q
+    cons_b = h_u + m_uc @ qc
+
+    # Solve the QP problem
+
+    v1 = jnp.linalg.solve(big_q, small_q)
+    v2 = jnp.linalg.solve(big_q, cons_a.T)
+    v3 = cons_a @ v2
+    v4 = cons_a @ v1 - cons_b
+
+    sol = v1 - v2 @ jnp.linalg.solve(v3, v4)
+
+    q_u = sol[:6]
+    f = sol[6:]
+    return f, q_u
+
+
 
 def qp_cons(m_u_uc, h_u, qp_weights,
             oriens, s, w, ju, ids):
