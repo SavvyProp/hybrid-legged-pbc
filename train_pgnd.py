@@ -9,6 +9,7 @@ from brax.training.agents.ppo import networks as ppo_networks
 from brax.training.agents.ppo import train as ppo
 from mujoco_playground import wrapper
 from mujoco_playground import registry
+from playground.booster.config import ppo_params
 env_cfg = joystick.default_config()
 env = joystick.Joystick()
 eval_env = joystick.Joystick()
@@ -17,7 +18,7 @@ env_name = "T1JoystickFlatTerrain"
 #eval_env = registry.load(env_name, config=env_cfg)
 domain_randomize = registry.get_domain_randomizer(env_name)
 #from playground.booster.config import ppo_params
-ppo_params = locomotion_params.brax_ppo_config(env_name)
+#ppo_params = locomotion_params.brax_ppo_config(env_name)
 ppo_training_params = dict(ppo_params)
 
 

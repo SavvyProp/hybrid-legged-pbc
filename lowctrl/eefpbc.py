@@ -294,7 +294,8 @@ def step(mjx_model, state, act, ids, override_pos = None):
     j_c = jacs[:, 6:]
     m_cu = m_uc[6:, :6]
     m_cc = m_uc[6:, 6:]
-    u_b_ff = (-j_c.T @ f + m_cu @ q_u) * qp_weights[2] + h_c
+    u_b_ff = -j_c.T @ f + m_cu @ q_u + h_c
+    u_b_ff *= qp_weights[2]
     #u_b_fb = m_cc @ qc
     ec_ik = qpos[7:] - des_pos
 
