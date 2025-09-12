@@ -31,9 +31,14 @@ def make_omega(w, ids):
     omega = vec2diags(weights, ids)
     return omega
 
+def make_omega2(w, ids):
+    weights = jnp.exp(w)
+    omega = vec2diags(weights, ids)
+    return omega
+
 
 def make_acc_cons(w, ju, lstsq_opt, ids):
-    omega = make_omega(w, ids)
+    omega = make_omega2(w, ids)
     ju = omega @ ju
     lstsq_opt = omega @ lstsq_opt
     big_q_a = 2 * ju.T @ ju
