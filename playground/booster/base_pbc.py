@@ -36,8 +36,6 @@ def step(
 ) -> mjx.Data:
   def single_step(data, _):
     ctrl = eefpbc.step(model, data, action, bids.ids)
-    #print(ctrl)
-    #print(data.ctrl)
     data = data.replace(ctrl = ctrl)
     data = mjx.step(model, data)
     return data, None
@@ -154,9 +152,6 @@ class T1Env(mjx_env.MjxEnv):
   def mjx_model(self) -> mjx.Model:
     return self._mjx_model
   
-  def step(self, state, action):
-    new_data = step(self.mjx_model, state, action, self.n_substeps)
-    return new_data
   
   def make_data(self, mj_model, **kwargs):
     return make_data(mj_model, **kwargs)

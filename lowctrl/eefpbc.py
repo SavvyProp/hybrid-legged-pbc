@@ -296,13 +296,14 @@ def step(mjx_model, state, act, ids, override_pos = None):
     m_cc = m_uc[6:, 6:]
     u_b_ff = -j_c.T @ f + m_cu @ q_u + h_c
     u_b_ff *= qp_weights[2] * 0.0
-    #u_b_fb = m_cc @ qc
+    u_b_ff = jnp.nan_to_num(u_b_ff, posinf = 0.0, neginf = 0.0, nan = 0.0)
+    #u_b_fb = -m_cc @ qc
     ec_ik = qpos[7:] - des_pos
 
     u_b_fb = ids["p_gains"] * ec_ik
 
-    u = u_b_ff - u_b_fb
-    
+    #u = u_b_ff - u_b_fb
+    u = -u_b_fb
     tau_limits = ids["tau_limits"]
     u = jnp.clip(u, -tau_limits, tau_limits)
     return u
