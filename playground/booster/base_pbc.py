@@ -144,7 +144,7 @@ class T1Env(mjx_env.MjxEnv):
   def action_size(self) -> int:
     jnt_num = self.ids["ctrl_num"]
     eef_num = self.ids["eef_num"]
-    return jnt_num + eef_num * 4 + 2
+    return jnt_num + eef_num * 4 + eefpbc.W_SIZE
 
   @property
   def mj_model(self) -> mujoco.MjModel:

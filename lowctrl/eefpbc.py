@@ -126,13 +126,15 @@ def logit2gndacc(logit, ids):
     linacc = jnp.reshape(linacc, (eef_num, 6))
     return linacc
 
+W_SIZE = 3
+
 def ctrl2logits(ctrl, ids):
     jnt_num = ids["ctrl_num"]
     eef_num = ids["eef_num"]
     des_pos_logit = ctrl[:jnt_num]
-    qp_weight_logit = ctrl[jnt_num :jnt_num + 2]
-    w = ctrl[jnt_num + 2: jnt_num + eef_num + 2]
-    oriens = ctrl[jnt_num + eef_num + 2: jnt_num + eef_num * 4 + 2]
+    qp_weight_logit = ctrl[jnt_num :jnt_num + W_SIZE]
+    w = ctrl[jnt_num + W_SIZE: jnt_num + eef_num + W_SIZE]
+    oriens = ctrl[jnt_num + eef_num + W_SIZE: jnt_num + eef_num * 4 + W_SIZE]
     
     return des_pos_logit, qp_weight_logit, w, oriens
 
@@ -292,7 +294,7 @@ def step(mjx_model, state, act, ids, override_pos = None):
     j_c = jacs[:, 6:]
     m_cu = m_uc[6:, :6]
     m_cc = m_uc[6:, 6:]
-    u_b_ff = -j_c.T @ f + m_cu @ q_u + h_c
+    u_b_ff = (-j_c.T @ f + m_cu @ q_u) * qp_weights[2] + h_c
     #u_b_fb = m_cc @ qc
     ec_ik = qpos[7:] - des_pos
 
@@ -306,7 +308,7 @@ def step(mjx_model, state, act, ids, override_pos = None):
 
 def default_act(ids):
 	pos = ids["default_qpos"][7:]
-	qp_weights = jnp.array([4, 4])
+	qp_weights = jnp.ones([W_SIZE]) * 4
 	w = jnp.array([10., 10., -5., -5.])
 	target_orien = jnp.array([
        [0., 0., 1.],
