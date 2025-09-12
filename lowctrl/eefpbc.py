@@ -301,7 +301,7 @@ def step(mjx_model, state, act, ids, override_pos = None):
 
     u_b_fb = ids["p_gains"] * ec_ik
 
-    u = u_b_ff + u_b_fb
+    u = u_b_ff - u_b_fb
     
     tau_limits = ids["tau_limits"]
     u = jnp.clip(u, -tau_limits, tau_limits)
