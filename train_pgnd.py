@@ -13,12 +13,6 @@ from playground.booster.config import ppo_params
 env_cfg = joystick.default_config()
 env = joystick.Joystick()
 eval_env = joystick.Joystick()
-env_name = "T1JoystickFlatTerrain"
-#env = registry.load(env_name)
-#eval_env = registry.load(env_name, config=env_cfg)
-domain_randomize = registry.get_domain_randomizer(env_name)
-#from playground.booster.config import ppo_params
-#ppo_params = locomotion_params.brax_ppo_config(env_name)
 ppo_training_params = dict(ppo_params)
 
 
