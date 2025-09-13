@@ -17,6 +17,7 @@ from brax.training.acme import running_statistics
 from playground.booster import joystick_pbc as joystick
 from playground.booster.config import ppo_params
 from lowctrl.eefpbc import ctrl2components
+import lowctrl.eefpbc as eefpbc
 from models.booster_t1_pgnd.booster_ids import ids
 env = joystick.Joystick()
 
@@ -42,15 +43,20 @@ def makeIFN():
     make_inference_fn = ppo_networks.make_inference_fn(ppo_network)
     return make_inference_fn
 
-def debug_eefpbc(act):
+#jit_debug_step = jax.jit(eefpbc.debug_step)
+
+def debug_eefpbc(state, act):
     from models.booster_t1_pgnd.booster_ids import ids
     (des_pos, 
      qp_weights, 
      w, oriens, 
     ) = ctrl2components(act, ids)
-    print(w)
+    #print(qp_weights[2])
+    f, qu = eefpbc.debug_step(env._mjx_model, state, act, ids)
+    print(f, qu)
+    
 
-dir = "training/test_pd_2"
+dir = "training/test_pbc_9"
 
 model_path = dir + "/walk_policy"
 saved_params = model.load_params(model_path)
@@ -83,7 +89,7 @@ for c in range(1000):
     pipeline_state = state.data
     #print(state.data.contact)
     print(state.info["last_contact"])
-    debug_eefpbc(ctrl)
+    debug_eefpbc(state.data, ctrl)
     #print(ids["col"])
     #print(state.data.sensordata)
     #debug_eefpbc(ctrl)

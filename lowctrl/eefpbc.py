@@ -302,11 +302,40 @@ def step(mjx_model, state, act, ids, override_pos = None):
 
     u_b_fb = ids["p_gains"] * ec_ik
 
-    #u = u_b_ff - u_b_fb
-    u = -u_b_fb
+    u = u_b_ff - u_b_fb
+    #u = -u_b_fb
     tau_limits = ids["tau_limits"]
     u = jnp.clip(u, -tau_limits, tau_limits)
     return u
+
+
+def debug_step(mjx_model, state, act, ids):
+    jacs = jac_stack(mjx_model, state, ids)
+    jvp = get_djp(mjx_model, state, ids)
+    m_uc, h_uc = get_mh(mjx_model, state, ids)
+
+    (des_pos, 
+     qp_weights, 
+     w, oriens, 
+     ) = ctrl2components(act, ids)
+    
+    qpos = state.qpos[ids["joint_pos_ids"]]
+
+    qacc_gain = 400.0
+    qc = qacc_gain * (des_pos - qpos[7:])
+    
+    qc0 = jnp.zeros_like(qc)
+    eef_acc = jnp.zeros([6 * ids["eef_num"]])
+
+    print("jvp", jvp)
+
+    f, q_u = qp_solve(m_uc, h_uc, 
+                qp_weights, oriens, w, 
+                jacs, jvp, 
+                eef_acc, qc0,
+                ids)
+    
+    return f, q_u
 
 def default_act(ids):
 	pos = ids["default_qpos"][7:]

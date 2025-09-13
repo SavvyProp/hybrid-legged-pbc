@@ -32,8 +32,8 @@ t = 0
 def step_fn(mjx_model, mjx_state, t):
     act = default_act(bids.ids)
     pos = bids.ids["default_qpos"][7:]
-    pos = pos.at[2].set(jnp.sin(t) * 0.4)
-    pos = pos.at[6].set(jnp.sin(t) * 0.4)
+    #pos = pos.at[2].set(jnp.sin(t) * 0.4)
+    #pos = pos.at[6].set(jnp.sin(t) * 0.4)
     ctrl = eefpbc.step(mjx_model, mjx_state, act, bids.ids, override_pos = pos)
     data = mjx_state.replace(ctrl=ctrl)
     data = mjx.step(mjx_model, data)
