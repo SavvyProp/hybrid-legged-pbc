@@ -27,13 +27,18 @@ def make_theta(oriens, s, ids):
     return theta
 
 def make_omega(w, ids):
-    #weights = jnp.exp(-1 * w)
-    weights = nn.sigmoid(-1 * w)
+    w = jnp.clip(w, min = -6)
+    weights = jnp.exp(-1 * w)
+    #weights = jnp.clip(weights, min = 0.0, max = 1e2)
+    #weights = nn.sigmoid(-1 * w)
     omega = vec2diags(weights, ids)
     return omega
 
 def make_omega2(w, ids):
-    weights = nn.sigmoid(8 * w)
+    #weights = nn.sigmoid(1 * w)
+    w = jnp.clip(w, max = 6)
+    weights = jnp.exp(w)
+    #weights = jnp.clip(weights, min = 0.0, max = 1e2)
     omega = vec2diags(weights, ids)
     return omega
 
@@ -43,7 +48,7 @@ def make_acc_cons(w, ju, lstsq_opt, ids):
     ju = 1 * omega @ ju
     lstsq_opt = 1 * omega @ lstsq_opt
     big_q_a = 2 * ju.T @ ju
-    #big_q_a += jnp.eye(6) * 1e-2
+    #big_q_a += jnp.eye(6) * 1e-6
     small_q_a = 2 * ju.T @ lstsq_opt
     return big_q_a, small_q_a
 
