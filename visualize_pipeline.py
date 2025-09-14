@@ -54,7 +54,7 @@ def debug_eefpbc(state, act):
     print(qp_weights[2])
     
 
-dir = "training/test_pbc_10"
+dir = "training/test_pbc_11"
 
 model_path = dir + "/walk_policy"
 saved_params = model.load_params(model_path)
