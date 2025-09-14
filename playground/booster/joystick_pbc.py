@@ -29,9 +29,9 @@ from mujoco_playground._src import mjx_env
 from mujoco_playground._src.locomotion.t1 import t1_constants as consts
 from playground.booster import base_pbc as t1_base
 from rewards import rewards
-from lowctrl.eefpbc import ctrl2logits, ctrl2components, default_act
+from lowctrl.eefpbc import ctrl2logits, ctrl2components, default_act, get_frc
 from playground.booster.base_pbc import step as pbc_step
-from rewards.mjx_col import get_contacts
+from rewards.mjx_col import get_contacts, get_forces
 from flax import linen as nn
 
 def default_config() -> config_dict.ConfigDict:
@@ -87,7 +87,8 @@ def default_config() -> config_dict.ConfigDict:
               feet_distance=-1.0,
               collision=-1.0,
               pbc_w=-1.0,
-              qp_weight=0.25
+              qp_weight=0.25,
+              frc_equiv=0.25
           ),
           tracking_sigma=0.25,
           max_foot_height=0.12,
@@ -106,6 +107,11 @@ def default_config() -> config_dict.ConfigDict:
       njmax=80,
   )
 
+from models.booster_t1_pgnd import booster_ids as bids
+@jax.jit
+def get_frc_pbc(mjx_model, state, act):
+    f, qu = get_frc(mjx_model, state, act, bids.ids)
+    return f, qu
 
 class Joystick(t1_base.T1Env):
   """Track a joystick command."""
@@ -567,7 +573,20 @@ class Joystick(t1_base.T1Env):
         "feet_distance": self._cost_feet_distance(data, info),
         "pbc_w": self._cost_pbc_w(action, contact),
         "qp_weight": self._reward_qp_weight(action),
+        "frc_equiv": self._reward_frc_equiv(data, action)
     }
+  
+  def _reward_frc_equiv(self, data, action):
+    l_true, r_true = get_forces(data, self.ids)
+    f, q_u = get_frc_pbc(self._mjx_model, data, action)
+    lf = f[0:3]
+    rf = f[6:9]
+    fac = 20000
+    left_frc_error = jp.sum(jp.square(lf - l_true)) / fac
+    right_frc_error = jp.sum(jp.square(rf - r_true)) / fac
+    frc_error = left_frc_error + right_frc_error
+    return jp.exp(-frc_error)
+
   
 
   # Tracking rewards.

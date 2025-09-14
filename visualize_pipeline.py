@@ -19,6 +19,8 @@ from playground.booster.config import ppo_params
 from lowctrl.eefpbc import ctrl2components
 import lowctrl.eefpbc as eefpbc
 from models.booster_t1_pgnd.booster_ids import ids
+from rewards.mjx_col import get_forces
+
 env = joystick.Joystick()
 
 jit_reset = jax.jit(env.reset)
@@ -44,17 +46,27 @@ def makeIFN():
     return make_inference_fn
 
 #jit_debug_step = jax.jit(eefpbc.debug_step)
+from models.booster_t1_pgnd.booster_ids import ids
+
+@jax.jit
+def get_frc(mjx_model, state, act):
+    f, qu = eefpbc.get_frc(mjx_model, state, act, ids)
+    return f, qu
 
 def debug_eefpbc(state, act):
-    from models.booster_t1_pgnd.booster_ids import ids
     (des_pos, 
      qp_weights, 
      w, oriens, 
     ) = ctrl2components(act, ids)
-    print(qp_weights[2])
-    
+    left_forces, right_forces = get_forces(state, ids)
+    print("left forces", left_forces)
+    print("right forces", right_forces)
+    f, q_u = get_frc(env._mjx_model, state, act)
+    print("f", f[0:3], f[6:9])
+    q_acc = state.qacc
+    print("qddot_u", q_acc[0:3])
 
-dir = "training/test_pbc_11"
+dir = "training/test_pbc_12"
 
 model_path = dir + "/walk_policy"
 saved_params = model.load_params(model_path)
@@ -88,6 +100,8 @@ for c in range(1000):
     #print(state.data.contact)
     print(state.info["last_contact"])
     debug_eefpbc(state.data, ctrl)
+
+    print(state.metrics["reward/frc_equiv"])
     #print(ids["col"])
     #print(state.data.sensordata)
     #debug_eefpbc(ctrl)
