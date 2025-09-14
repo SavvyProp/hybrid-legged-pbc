@@ -51,12 +51,10 @@ def debug_eefpbc(state, act):
      qp_weights, 
      w, oriens, 
     ) = ctrl2components(act, ids)
-    #print(qp_weights[2])
-    f, qu = eefpbc.debug_step(env._mjx_model, state, act, ids)
-    print(f, qu)
+    print(qp_weights[2])
     
 
-dir = "training/test_pbc_9"
+dir = "training/test_pbc_10"
 
 model_path = dir + "/walk_policy"
 saved_params = model.load_params(model_path)

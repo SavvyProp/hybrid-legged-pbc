@@ -32,6 +32,7 @@ from rewards import rewards
 from lowctrl.eefpbc import ctrl2logits, ctrl2components, default_act
 from playground.booster.base_pbc import step as pbc_step
 from rewards.mjx_col import get_contacts
+from flax import linen as nn
 
 def default_config() -> config_dict.ConfigDict:
   return config_dict.create(
@@ -86,6 +87,7 @@ def default_config() -> config_dict.ConfigDict:
               feet_distance=-1.0,
               collision=-1.0,
               pbc_w=-1.0,
+              qp_weight=0.25
           ),
           tracking_sigma=0.25,
           max_foot_height=0.12,
@@ -564,10 +566,17 @@ class Joystick(t1_base.T1Env):
         "pose": self._cost_pose(data.qpos[7:]),
         "feet_distance": self._cost_feet_distance(data, info),
         "pbc_w": self._cost_pbc_w(action, contact),
+        "qp_weight": self._reward_qp_weight(action),
     }
   
 
   # Tracking rewards.
+  def _reward_qp_weight(self, action):
+    (des_pos_logit, 
+         qp_weight_logit, 
+         w, oriens_logit) = ctrl2logits(action, self.ids)
+    qp_weight = nn.sigmoid(w)
+    return qp_weight[2]
 
   def _cost_pbc_w(self, action, contact):
     (des_pos_logit, 
