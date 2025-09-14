@@ -35,9 +35,9 @@ def make_omega(w, ids):
     return omega
 
 def make_omega2(w, ids):
-    #weights = nn.sigmoid(1 * w)
-    w = jnp.clip(w, max = 6)
-    weights = jnp.exp(w)
+    weights = nn.sigmoid(1 * w)
+    #w = jnp.clip(w, max = 6)
+    #weights = jnp.exp(w)
     #weights = jnp.clip(weights, min = 0.0, max = 1e2)
     omega = vec2diags(weights, ids)
     return omega
@@ -45,8 +45,8 @@ def make_omega2(w, ids):
 
 def make_acc_cons(w, ju, lstsq_opt, ids):
     omega = make_omega2(w, ids)
-    ju = 1 * omega @ ju
-    lstsq_opt = 1 * omega @ lstsq_opt
+    ju = 1e3 * omega @ ju
+    lstsq_opt = 1e3 * omega @ lstsq_opt
     big_q_a = 2 * ju.T @ ju
     #big_q_a += jnp.eye(6) * 1e-6
     small_q_a = 2 * ju.T @ lstsq_opt
@@ -79,6 +79,8 @@ def qp_solve(m, h,
                        [jnp.zeros([f_size, 6]), q_frc]])
     small_q = jnp.concatenate([small_q_a, jnp.zeros([f_size])], axis = 0)
 
+    print(jnp.linalg.norm(theta), jnp.linalg.norm(omega), jnp.linalg.norm(big_q_a))
+
     # Setup constraints
     i_q = jnp.concatenate([jnp.eye(6), jnp.zeros([6, f_size])], axis = 1)
     i_frc = jnp.concatenate([jnp.zeros([f_size, 6]), jnp.eye(f_size)], axis = 1)
@@ -104,14 +106,41 @@ def qp_solve(m, h,
     f = sol[6:]
     return f, q_u
 
+def qp_solve2(m, h, 
+            qp_weights, oriens, w, 
+            jacs, jvp, 
+            a_stc, qc,
+            ids,
+            ):
+    qu = qp_solve_qu(jacs, jvp, qc, w, a_stc, ids)
+    m_u_uc = m[:6, :]
+    h_u = h[:6]
+    ju = jacs[:, :6]
+    cons_d, cons_h = qp_cons(m_u_uc, h_u, qp_weights,
+                             oriens, w, ju, ids)
+    f = cons_d @ jnp.concatenate([qu, qc], axis = 0) + cons_h
+    return f, qu
 
+def qp_solve_qu(jacs, jvp, qc, w, a_stc, ids):
+    ju = jacs[:, :6]
+    jc = jacs[:, 6:]
+    lstsq_opt = a_stc - jvp - jc @ qc
+    omega = make_omega2(w, ids)
+    ju = omega @ ju
+    lstsq_opt = omega @ lstsq_opt
+    #sol = ju.T @ jnp.linalg.solve(ju @ ju.T, lstsq_opt)
+    sol = jnp.linalg.solve(ju.T @ ju, ju.T @ lstsq_opt)
+    return sol
 
 def qp_cons(m_u_uc, h_u, qp_weights,
-            oriens, s, w, ju, ids):
+            oriens, w, ju, ids):
+    s = nn.sigmoid(w)
     theta = make_theta(oriens, s, ids)
     omega = make_omega(w, ids)
 
     q = theta * qp_weights[0] + omega * qp_weights[1]
+
+
     qinv = jnp.linalg.inv(q)
 
     sol1 = jnp.matmul(ju.T, jnp.matmul(qinv, ju))

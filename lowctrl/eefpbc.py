@@ -3,7 +3,7 @@ from mujoco import mjx
 import jax
 import lowctrl.math as lmath
 import lowctrl.pd as lpd
-from lowctrl.qp_cons import qp_solve
+from lowctrl.qp_cons import qp_solve, qp_solve2
 from flax import linen as nn
 
 def get_jac(mjx_model, mjx_data, site_name, ids):
@@ -281,13 +281,13 @@ def step(mjx_model, state, act, ids, override_pos = None):
     qacc_gain = 400.0
     qc = qacc_gain * (des_pos - qpos[7:])
     
-    qc0 = jnp.zeros_like(qc)
+    #qc0 = jnp.zeros_like(qc)
     eef_acc = jnp.zeros([6 * ids["eef_num"]])
 
-    f, q_u = qp_solve(m_uc, h_uc, 
+    f, q_u = qp_solve2(m_uc, h_uc, 
                 qp_weights, oriens, w, 
                 jacs, jvp, 
-                eef_acc, qc0,
+                eef_acc, qc,
                 ids)
     
     h_c = h_uc[6:]
@@ -297,10 +297,10 @@ def step(mjx_model, state, act, ids, override_pos = None):
     u_b_ff = -j_c.T @ f + m_cu @ q_u + h_c
     u_b_ff *= qp_weights[2]
     u_b_ff = jnp.nan_to_num(u_b_ff, posinf = 0.0, neginf = 0.0, nan = 0.0)
-    #u_b_fb = -m_cc @ qc
-    ec_ik = qpos[7:] - des_pos
+    u_b_fb = -m_cc @ qc
+    #ec_ik = qpos[7:] - des_pos
 
-    u_b_fb = ids["p_gains"] * ec_ik
+    #u_b_fb = ids["p_gains"] * ec_ik
 
     u = u_b_ff - u_b_fb
     #u = -u_b_fb
@@ -329,7 +329,7 @@ def debug_step(mjx_model, state, act, ids):
 
     print("jvp", jvp)
 
-    f, q_u = qp_solve(m_uc, h_uc, 
+    f, q_u = qp_solve2(m_uc, h_uc, 
                 qp_weights, oriens, w, 
                 jacs, jvp, 
                 eef_acc, qc0,
