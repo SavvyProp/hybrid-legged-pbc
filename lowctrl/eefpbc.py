@@ -281,13 +281,13 @@ def step(mjx_model, state, act, ids, override_pos = None):
     qacc_gain = 400.0
     qc = qacc_gain * (des_pos - qpos[7:])
     
-    #qc0 = jnp.zeros_like(qc)
+    qc0 = jnp.zeros_like(qc)
     eef_acc = jnp.zeros([6 * ids["eef_num"]])
 
     f, q_u = qp_solve2(m_uc, h_uc, 
                 qp_weights, oriens, w, 
                 jacs, jvp, 
-                eef_acc, qc,
+                eef_acc, qc0,
                 ids)
     
     h_c = h_uc[6:]
@@ -297,10 +297,10 @@ def step(mjx_model, state, act, ids, override_pos = None):
     u_b_ff = -j_c.T @ f + m_cu @ q_u + h_c
     u_b_ff *= qp_weights[2]
     u_b_ff = jnp.nan_to_num(u_b_ff, posinf = 0.0, neginf = 0.0, nan = 0.0)
-    u_b_fb = -m_cc @ qc
-    #ec_ik = qpos[7:] - des_pos
+    #u_b_fb = -m_cc @ qc
+    ec_ik = qpos[7:] - des_pos
 
-    #u_b_fb = ids["p_gains"] * ec_ik
+    u_b_fb = ids["p_gains"] * ec_ik
 
     u = u_b_ff - u_b_fb
     #u = -u_b_fb
