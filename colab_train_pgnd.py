@@ -1,20 +1,18 @@
-from playground.booster import joystick
-#rom playground.booster import joystick_pbc as joystick
-from playground.booster.randomize import domain_randomize
+from playground.booster import joystick_maqp as joystick
 from mujoco_playground.config import locomotion_params
+from playground.booster.randomize import domain_randomize
 from datetime import datetime
 import functools
 import matplotlib.pyplot as plt
 from brax.training.agents.ppo import networks as ppo_networks
 from brax.training.agents.ppo import train as ppo
 from mujoco_playground import wrapper
+from playground.booster.config import ppo_params
 
 def make_trainfn():
+    env_cfg = joystick.default_config()
     env = joystick.Joystick()
     eval_env = joystick.Joystick()
-    env_cfg = joystick.default_config()
-    from playground.booster.config import ppo_params
-    env_name = "T1JoystickFlatTerrain"
 
 
     x_data, y_data, y_dataerr = [], [], []
@@ -36,6 +34,7 @@ def make_trainfn():
         plt.show()
 
     ppo_training_params = dict(ppo_params)
+
     network_factory = ppo_networks.make_ppo_networks
     if "network_factory" in ppo_params:
         del ppo_training_params["network_factory"]
@@ -47,8 +46,8 @@ def make_trainfn():
     train_fn = functools.partial(
         ppo.train, **dict(ppo_training_params),
         network_factory=network_factory,
+        randomization_fn = domain_randomize,
         progress_fn=progress,
-        randomization_fn = domain_randomize
     )
 
     return train_fn, env, eval_env, wrapper.wrap_for_brax_training
