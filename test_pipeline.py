@@ -1,61 +1,74 @@
-from brax import envs
-from envs.booster_flatwalk_pd import FlatwalkEnv as FlatwalkEnvPD
-from envs.booster_flatwalk_pbc import FlatwalkEnv as FlatwalkEnvPBC
-import jax
+import mujoco
+import mujoco.viewer
+from mujoco import mjx
 import jax.numpy as jnp
+from lowctrl.maqp import default_act
+from lowctrl import maqp
+from models.booster_t1_pgnd import booster_ids as bids
+import jax
 import time
-from pipelines.booster_eefpbc import default_act
 
-def env_step_runtime(ENV, name, ctrl):
-    envs.register_environment(name, ENV)
-    env = envs.get_environment(name)
-    jit_reset = jax.jit(env.reset)
-    jit_step = jax.jit(env.step)
-    state = jit_reset(jax.random.PRNGKey(0))
-    for c in range(100):
-        st = time.perf_counter()
-        state = jit_step(state, ctrl)
-        et = time.perf_counter() - st
-        print(f"Step {c}, Time taken: {et:.4f} seconds")
+model = mujoco.MjModel.from_xml_path('models/booster_t1/flat_scene.xml')
+data = mujoco.MjData(model)
+mjx_model = mjx.put_model(model)
 
-def env_step_runtime_batched(ENV, name, ctrl, batch_size=1000):
-    """Batched runtime test: vmap + jit over batch dimension."""
-    envs.register_environment(name, ENV)
-    env = envs.get_environment(name)
+init_qpos = model.keyframe('home').qpos
+data.qpos = init_qpos
+mujoco.mj_step(model, data) # sim first step
 
-    # Build batched initial state by vmapping reset over different keys
-    key = jax.random.PRNGKey(0)
-    keys = jax.random.split(key, batch_size)
-    batched_reset = jax.jit(jax.vmap(env.reset))
-    state = batched_reset(keys)
+init_com = data.subtree_com[0].copy()
 
-    # Prepare vmapped step (state, action) -> new_state
-    step_fn = jax.vmap(env.step, in_axes=(0, 0))
-    jit_step_batched = jax.jit(step_fn)
+act = default_act(bids.ids)
+ctrl = jnp.zeros([23])
 
-    # Timing loop
-    for c in range(100):
-        st = time.perf_counter()
-        state = jit_step_batched(state, ctrl)
-        et = time.perf_counter() - st
-        print(f"[BATCH {batch_size}] Step {c}, Time taken: {et:.4f} seconds")
 
-print("PD")
-ctrl_pd = jnp.zeros([46])
-env_step_runtime(FlatwalkEnvPD, 'digit_flatwalk_pd', ctrl_pd)
+state = mjx.put_data(model, data)
+t = 0
+@jax.jit
+def step_fn(mjx_model, mjx_state, init_com, t):
+    #act = default_act(bids.ids)
+    act = maqp.test_act_move_com(init_com, mjx_state, t, bids.ids)
+    ctrl = maqp.step(mjx_model, mjx_state, act, bids.ids, is_mjx = True)
+    data = mjx_state.replace(ctrl=ctrl)
+    data = mjx.step(mjx_model, data)
+    return data
 
-# Batched PD
-BATCH_SIZE = 1000
-ctrl_pd_batch = jnp.zeros([BATCH_SIZE, 46])
-print("PD Batched")
-env_step_runtime_batched(FlatwalkEnvPD, 'digit_flatwalk_pd_batched', ctrl_pd_batch, batch_size=BATCH_SIZE)
+# Add a benchmark utility to time step_fn and its vmapped version over a batch
 
-print("PBC")
+def benchmark_step(mjx_model, mjx_state, init_com, *, batch_size: int = 1000, iters: int = 10, t0: int = 0):
+    """Benchmark single-step and vmapped-step runtimes.
+    Prints total and per-step/per-item timings with JIT warmup and device sync.
+    """
+    # Warmup single step compile
+    out = step_fn(mjx_model, mjx_state, init_com, t0)
+    _ = jax.block_until_ready(out.qpos)
 
-ctrl_pbc = default_act()
-env_step_runtime(FlatwalkEnvPBC, 'digit_flatwalk_pbc', ctrl_pbc)
+    # Time single-step
+    t_start = time.perf_counter()
+    data_single = mjx_state
+    for k in range(iters):
+        data_single = step_fn(mjx_model, data_single, init_com, t0 + k)
+    _ = jax.block_until_ready(data_single.qpos)
+    t_single = time.perf_counter() - t_start
 
-# Batched PBC
-ctrl_pbc_batch = jnp.tile(ctrl_pbc[None, :], (BATCH_SIZE, 1))
-print("PBC Batched")
-env_step_runtime_batched(FlatwalkEnvPBC, 'digit_flatwalk_pbc_batched', ctrl_pbc_batch, batch_size=BATCH_SIZE)
+    # Prepare vmapped function (map over t only; model/state/init_com are broadcast)
+    vmapped = jax.jit(jax.vmap(step_fn, in_axes=(None, None, None, 0)))
+
+    # Warmup vmapped compile
+    t_vec = jnp.arange(batch_size, dtype=jnp.int32) + t0
+    out_b = vmapped(mjx_model, mjx_state, init_com, t_vec)
+    _ = jax.block_until_ready(out_b.qpos)
+
+    # Time vmapped call
+    t_start = time.perf_counter()
+    out_b = vmapped(mjx_model, mjx_state, init_com, t_vec)
+    _ = jax.block_until_ready(out_b.qpos)
+    t_vmapped = time.perf_counter() - t_start
+
+    print("Single-step: total_s=", t_single, " per_step_s=", t_single / iters)
+    print("Vmap batch:", batch_size, " total_s=", t_vmapped, " per_item_s=", t_vmapped / batch_size)
+
+
+if __name__ == "__main__":
+    benchmark_step(mjx_model, state, init_com, batch_size=1000, iters=10, t0=0)
+

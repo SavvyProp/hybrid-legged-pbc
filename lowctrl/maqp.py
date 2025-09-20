@@ -1,4 +1,6 @@
 import jax.numpy as jnp
+import jax
+import jax.scipy as jsp
 from lowctrl import math as lmath
 from lowctrl import model as lmodel
 from flax import linen as nn
@@ -20,7 +22,6 @@ def make_centroidal_a(m, eefpos, com_pos, ids):
     a = jnp.concatenate(f_blocks, axis = 1)
     g = jnp.array([0, 0, -9.81, 0, 0, 0])
     return a, g
-
 # Functions to build minimization objectives
 
 def centroidal_acc_q(q_ddot_com_ref):

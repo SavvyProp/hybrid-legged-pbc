@@ -103,7 +103,8 @@ def default_config() -> config_dict.ConfigDict:
               collision=-1.0,
               pbc_w=-1.0,
               qp_weight=0.05,
-              frc_equiv=0.25
+              frc_equiv=0.25,
+              des_vel=-2.0
           ),
           tracking_sigma=0.25,
           max_foot_height=0.12,
@@ -588,8 +589,21 @@ class Joystick(t1_base.T1Env):
         "feet_distance": self._cost_feet_distance(data, info),
         "pbc_w": self._cost_pbc_w(action, contact),
         "qp_weight": self._reward_weight_logit_weight(action),
-        "frc_equiv": self._reward_frc_equiv(data, action)
+        "frc_equiv": self._reward_frc_equiv(data, action),
+        "des_vel": self._reward_des_vel(action)
     }
+  
+  def _reward_des_vel(self, action):
+    des_pos, des_com_vel, des_com_angvel, w, qc_weight_logit = ctrl2logits(action, bids.ids)
+    des_vel_mag = jp.linalg.norm(des_com_vel)
+    des_angvel_mag = jp.linalg.norm(des_com_angvel)
+    des_vel_cap = 0.5
+    des_angvel_cap = 2.0
+    des_vel_rew = jp.clip(des_vel_mag - des_vel_cap,
+                           0,0, None)
+    des_angvel_rew = jp.clip(des_angvel_mag - des_angvel_cap,
+                           0,0, None)
+    return des_vel_rew + des_angvel_rew * 0.25
   
   def _reward_frc_equiv(self, data, action):
     l_true, r_true = get_forces(data, self.ids)
@@ -601,9 +615,7 @@ class Joystick(t1_base.T1Env):
     right_frc_error = jp.sum(jp.square(rf - r_true)) / fac
     frc_error = left_frc_error + right_frc_error
     return jp.exp(-frc_error)
-
   
-
   # Tracking rewards.
   def _reward_weight_logit_weight(self, action):
     des_pos, des_com_vel, des_com_angvel, w, qc_weight_logit = ctrl2logits(action, bids.ids)
