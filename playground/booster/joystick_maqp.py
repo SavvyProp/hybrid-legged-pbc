@@ -600,9 +600,9 @@ class Joystick(t1_base.T1Env):
     des_vel_cap = 0.5
     des_angvel_cap = 2.0
     des_vel_rew = jp.clip(des_vel_mag - des_vel_cap,
-                           0,0, None)
+                           min = 0.0, max = None)
     des_angvel_rew = jp.clip(des_angvel_mag - des_angvel_cap,
-                           0,0, None)
+                           min = 0.0, max = None)
     return des_vel_rew + des_angvel_rew * 0.25
   
   def _reward_frc_equiv(self, data, action):
