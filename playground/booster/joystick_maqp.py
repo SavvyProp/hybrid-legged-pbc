@@ -27,12 +27,27 @@ from mujoco_playground._src import gait
 from mujoco_playground._src import mjx_env
 #from mujoco_playground._src.locomotion.t1 import base as t1_base
 from mujoco_playground._src.locomotion.t1 import t1_constants as consts
-from playground.booster import base_pbc as t1_base
+from playground.booster import base_maqp as t1_base
 from rewards import rewards
-from lowctrl.eefpbc import ctrl2logits, ctrl2components, default_act, get_frc
-from playground.booster.base_pbc import step as pbc_step
+from lowctrl.maqp import ctrl2logits, default_act, get_frc
+from lowctrl import maqp
 from rewards.mjx_col import get_contacts, get_forces
 from flax import linen as nn
+
+def phys_step(
+    model: mjx.Model,
+    data: mjx.Data,
+    action: jax.Array,
+    n_substeps: int = 1,
+) -> mjx.Data:
+  def single_step(data, _):
+    ctrl = maqp.step(model, data, action, bids.ids, is_mjx = True)
+    data = data.replace(ctrl = ctrl)
+    data = mjx.step(model, data)
+    return data, None
+
+  return jax.lax.scan(single_step, data, (), n_substeps)[0]
+
 
 def default_config() -> config_dict.ConfigDict:
   return config_dict.create(
@@ -87,7 +102,7 @@ def default_config() -> config_dict.ConfigDict:
               feet_distance=-1.0,
               collision=-1.0,
               pbc_w=-1.0,
-              qp_weight=0.25,
+              qp_weight=0.05,
               frc_equiv=0.25
           ),
           tracking_sigma=0.25,
@@ -110,8 +125,8 @@ def default_config() -> config_dict.ConfigDict:
 from models.booster_t1_pgnd import booster_ids as bids
 @jax.jit
 def get_frc_pbc(mjx_model, state, act):
-    f, qu = get_frc(mjx_model, state, act, bids.ids)
-    return f, qu
+    f = get_frc(mjx_model, state, act, bids.ids, is_mjx = True)
+    return f
 
 class Joystick(t1_base.T1Env):
   """Track a joystick command."""
@@ -340,7 +355,7 @@ class Joystick(t1_base.T1Env):
     # state = self._reset_if_outside_bounds(state)
 
     motor_targets = action #self._default_pose + action * self._config.action_scale
-    data = pbc_step(
+    data = phys_step(
         self.mjx_model, state.data, motor_targets, self.n_substeps
     )
     state.info["motor_targets"] = motor_targets
@@ -572,13 +587,13 @@ class Joystick(t1_base.T1Env):
         "pose": self._cost_pose(data.qpos[7:]),
         "feet_distance": self._cost_feet_distance(data, info),
         "pbc_w": self._cost_pbc_w(action, contact),
-        "qp_weight": self._reward_qp_weight(action),
+        "qp_weight": self._reward_weight_logit_weight(action),
         "frc_equiv": self._reward_frc_equiv(data, action)
     }
   
   def _reward_frc_equiv(self, data, action):
     l_true, r_true = get_forces(data, self.ids)
-    f, q_u = get_frc_pbc(self._mjx_model, data, action)
+    f = get_frc_pbc(self._mjx_model, data, action)
     lf = f[0:3]
     rf = f[6:9]
     fac = 20000
@@ -590,17 +605,17 @@ class Joystick(t1_base.T1Env):
   
 
   # Tracking rewards.
-  def _reward_qp_weight(self, action):
-    (des_pos_logit, 
-         qp_weight_logit, 
-         w, oriens_logit) = ctrl2logits(action, self.ids)
-    qp_weight = nn.sigmoid(w)
-    return qp_weight[2]
+  def _reward_weight_logit_weight(self, action):
+    des_pos, des_com_vel, des_com_angvel, w, qc_weight_logit = ctrl2logits(action, bids.ids)
+
+    rew = jp.sum(jp.square(qc_weight_logit))
+    rew = jp.exp(-rew / 2.0)
+
+    return rew
 
   def _cost_pbc_w(self, action, contact):
-    (des_pos_logit, 
-         qp_weight_logit, 
-         w, oriens_logit) = ctrl2logits(action, self.ids)
+    des_pos, des_com_vel, des_com_angvel, w, qc_weight_logit = ctrl2logits(action, bids.ids)
+
     return rewards.reward_pbc_w_leg_only(w, contact)
 
   def _reward_tracking_lin_vel(

@@ -2,9 +2,8 @@ import mujoco
 import mujoco.viewer
 from mujoco import mjx
 import jax.numpy as jnp
-from pipelines.booster_eefpbc import multistep, init
-from lowctrl.eefpbc import default_act
-from lowctrl import eefpbc
+from lowctrl.maqp import default_act
+from lowctrl import maqp
 from models.booster_t1_pgnd import booster_ids as bids
 import jax
 
@@ -16,25 +15,19 @@ init_qpos = model.keyframe('home').qpos
 data.qpos = init_qpos
 mujoco.mj_step(model, data) # sim first step
 
+init_com = data.subtree_com[0].copy()
+
 act = default_act(bids.ids)
 ctrl = jnp.zeros([23])
 
 
-state = init(
-    mjx_model,
-    jnp.array(init_qpos),
-    jnp.zeros(model.nv),
-    jnp.zeros([0,]),
-    ctrl,
-)
+state = mjx.put_data(model, data)
 t = 0
 @jax.jit
-def step_fn(mjx_model, mjx_state, t):
-    act = default_act(bids.ids)
-    pos = bids.ids["default_qpos"][7:]
-    #pos = pos.at[2].set(jnp.sin(t) * 0.4)
-    #pos = pos.at[6].set(jnp.sin(t) * 0.4)
-    ctrl = eefpbc.step(mjx_model, mjx_state, act, bids.ids, override_pos = pos)
+def step_fn(mjx_model, mjx_state, init_com, t):
+    #act = default_act(bids.ids)
+    act = maqp.test_act_move_com(init_com, mjx_state, t, bids.ids)
+    ctrl = maqp.step(mjx_model, mjx_state, act, bids.ids, is_mjx = True)
     data = mjx_state.replace(ctrl=ctrl)
     data = mjx.step(mjx_model, data)
     return data
@@ -44,7 +37,7 @@ viewer = mujoco.viewer.launch_passive(model, data)
 for c in range(5000):
     print("step {}".format(c))
     #mujoco.mj_step(model, data)
-    state = step_fn(mjx_model, state, t)
+    state = step_fn(mjx_model, state, init_com, t)
     #m_uc, h_uc = eefpbc.get_mh(mjx_model, state, bids.ids)
     #print(m_uc)
     #if (c % 100) == 0:

@@ -26,21 +26,7 @@ from mujoco_playground._src import mjx_env
 from mujoco_playground._src.locomotion.t1 import t1_constants as consts
 
 from models.booster_t1_pgnd import booster_ids as bids
-from lowctrl import eefpbc
-
-def step(
-    model: mjx.Model,
-    data: mjx.Data,
-    action: jax.Array,
-    n_substeps: int = 1,
-) -> mjx.Data:
-  def single_step(data, _):
-    ctrl = eefpbc.step(model, data, action, bids.ids)
-    data = data.replace(ctrl = ctrl)
-    data = mjx.step(model, data)
-    return data, None
-
-  return jax.lax.scan(single_step, data, (), n_substeps)[0]
+from lowctrl import maqp
 
 def make_data(
     model: mujoco.MjModel,
@@ -140,9 +126,7 @@ class T1Env(mjx_env.MjxEnv):
 
   @property
   def action_size(self) -> int:
-    jnt_num = self.ids["ctrl_num"]
-    eef_num = self.ids["eef_num"]
-    return jnt_num + eef_num * 4 + eefpbc.W_SIZE
+    return maqp.default_act(self.ids).shape[0]
 
   @property
   def mj_model(self) -> mujoco.MjModel:
