@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 from brax.training.agents.ppo import networks as ppo_networks
 from brax.training.agents.ppo import train as ppo
 from mujoco_playground import wrapper
-from mujoco_playground import registry
 from playground.booster.config import ppo_params
 env_cfg = joystick.default_config()
 env = joystick.Joystick()

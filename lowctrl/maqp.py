@@ -39,7 +39,7 @@ def centroidal_cons_q(a, g):
     return big_q, small_q
 
 def f_mag_q(w, ids):
-    logits = -jnp.clip(w, -10.0, None)
+    logits = -jnp.clip(w, -6.0, 6.0)
     big_qp = lmath.vec2diags(jnp.exp(logits), ids)
     big_qp += jnp.eye(6 * ids["eef_num"]) * 1
     return big_qp, jnp.zeros(6 * ids["eef_num"])
@@ -102,16 +102,29 @@ def fullbody_u_cons(select, m, h, jacs):
     rhs = h_u
     return lhs, rhs
 
+def schur_solve(qp_q, qp_c, cons_lhs, cons_rhs):
+    Q = 0.5 * (qp_q + qp_q.T)
+    A = cons_lhs
+    c = qp_c
+    b = cons_rhs
+    Z = jnp.zeros((A.shape[0], A.shape[0]), dtype=jnp.float32)
+    KKT = jnp.block([[Q, A.T],
+                     [A, Z]])
+    rhs = jnp.concatenate([c, b], axis=0)
+    sol_all = jnp.linalg.solve(KKT, rhs)
+    sol = sol_all[:Q.shape[0]]
+    return sol
+
 def maqp(m, h, w, a_stc,
          eefpos, com_pos, 
          jacs, jvp, 
          com_jac, com_jvp, 
-         com_ref, qc_ref, qc_weight, ids, is_mjx = True):
+         com_ref, qc_ref, qc_weight, ids, is_mjx = True, debug = False):
     
     s = nn.sigmoid(w)
     
     # q_ddot_com, q_ddot_uc, F
-    weights = jnp.array([100000.0, 10000.0, 1.0, 0.1, 0.01, 0.01])
+    weights = jnp.array([10000.0, 1000.0, 1.0, 0.1, 0.01, 0.01])
     mat_height = 6 + 6 + ids["ctrl_num"] + 6 * ids["eef_num"]
     uc_size = ids["ctrl_num"] + 6
     F_size = ids["eef_num"] * 6
@@ -204,12 +217,13 @@ def maqp(m, h, w, a_stc,
 
      # Solve qp problem
 
-    v1 = jnp.linalg.solve(qp_q, qp_c)
-    v2 = jnp.linalg.solve(qp_q, cons_lhs.T)
-    v3 = cons_lhs @ v2
-    v4 = cons_lhs @ v1 - cons_rhs
+    #v1 = jnp.linalg.solve(qp_q, qp_c)
+    #v2 = jnp.linalg.solve(qp_q, cons_lhs.T)
+    #v3 = cons_lhs @ v2
+    #v4 = cons_lhs @ v1 - cons_rhs
 
-    sol = v1 - v2 @ jnp.linalg.solve(v3, v4)
+    #sol = v1 - v2 @ jnp.linalg.solve(v3, v4)
+    sol = schur_solve(qp_q, qp_c, cons_lhs, cons_rhs)
 
     q_ddot_com = sol[:6]
     f = sol[6:6 + ids["eef_num"] * 6]
@@ -221,12 +235,13 @@ def maqp(m, h, w, a_stc,
 
     ub = m_c_uc @ q_ddot_uc + hc - jacs[:, 6:].T @ f
 
-    if not is_mjx:
+    if (not is_mjx) and debug:
+        
+        # Existing prints
         print(f, q_ddot_com)
         print("amat2", a @ f + g)
-
         print("lhs ", cons_lhs.shape, jnp.linalg.matrix_rank(cons_lhs))
-        
+
         mu_uc = m[:6, :]
         ju = jacs[:, :6]
         uu = mu_uc @ q_ddot_uc + h[:6] - ju.T @ f
@@ -238,10 +253,69 @@ def maqp(m, h, w, a_stc,
         print("q_ddot_c", q_ddot_uc[6:])
         print("com_jvp ", com_jvp)
         print("com_jac ", com_jac)
-        
+
         exp_com = com_jac @ q_ddot_uc + com_jvp
         print("exp_com ", exp_com)
+
+        print("cons_mul: ", cons_lhs @ sol - cons_rhs)
+
     return ub, f
+
+
+def centroidal_qp(m, w,
+         eefpos, com_pos, 
+         jacs, 
+         com_ref, ids):
+    weights = jnp.array([1000.0, 1.0])
+    select = {
+        "q_ddot_com": jnp.concatenate([jnp.eye(6), jnp.zeros((6, 12))], axis = 1),
+        "F": jnp.concatenate([jnp.zeros([12, 6]), jnp.eye(12)], axis = 1),
+    }
+    a, g = make_centroidal_a(m,
+                          eefpos,
+                          com_pos,
+                          ids
+                          )
+    a = a[:, :12]
+
+    qp_q = jnp.zeros((18, 18))
+    qp_c = jnp.zeros((18, ))
+
+    big_q_com, small_q_com = centroidal_acc_q(com_ref)
+    big_q_com *= weights[0]
+    small_q_com *= weights[0]
+
+    qp_q = qp_q.at[:6, :6].add(big_q_com)
+    qp_c = qp_c.at[:6].add(small_q_com)
+
+    big_q_f, small_q_f = f_mag_q(w, ids)
+    big_q_f = big_q_f[:12, :12]
+    small_q_f = small_q_f[:12]
+    big_q_f *= weights[1]
+    small_q_f *= weights[1]
+
+    qp_q = qp_q.at[6: 18, 6: 18].add(big_q_f)
+    qp_c = qp_c.at[6: 18].add(small_q_f)
+
+    # make constraints
+    cons_lhs_list = []
+    cons_rhs_list = []
+
+    centroid_lhs1, centroid_rhs1 = centroidal_qacc_cons(select, a)
+    cons_lhs_list.append(centroid_lhs1)
+    cons_rhs_list.append(centroid_rhs1)
+
+    cons_lhs = jnp.vstack(cons_lhs_list)
+    cons_rhs = jnp.concatenate(cons_rhs_list, axis = 0)
+
+    sol = schur_solve(qp_q, qp_c, cons_lhs, cons_rhs)
+
+    q_ddot_com = sol[:6]
+    f = sol[6:]
+
+    leg_tau = jacs[:12, 6:].T @ f
+
+    return leg_tau
 
 def ctrl2logits(act, ids):
     des_pos = act[0:ids["ctrl_num"]]
@@ -255,10 +329,10 @@ def ctrl2components(act, ids):
     # des_pos, des_com_pos, w
     des_pos, des_com_vel, des_com_angvel, w, qc_weight_logit = ctrl2logits(act, ids)
     des_pos = ids["default_qpos"][7:] + jnp.tanh(des_pos) * 1.0
-    des_angvel = jnp.tanh(des_com_angvel) * 3.0
-    des_com_vel = jnp.tanh(des_com_vel) * 5.0
+    #des_angvel = jnp.tanh(des_com_angvel) * 3.0
+    #des_com_vel = jnp.tanh(des_com_vel) * 5.0
     qc_weight = nn.sigmoid(qc_weight_logit)
-    return des_pos, des_com_vel, des_angvel, w, qc_weight
+    return des_pos, des_com_vel, des_com_angvel, w, qc_weight
 
 def highlvlPD(data, des_pos, des_com_vel, des_angvel, ids):
     qpos = data.qpos[ids["joint_pos_ids"]]
@@ -311,6 +385,18 @@ def get_frc(model, data, act, ids, is_mjx = False):
                 com_accs, qacc_c,
                 qc_weight, ids, is_mjx = is_mjx)
     return f
+
+def step_centroidal(model, data, act, ids, is_mjx = False):
+    des_pos, des_com_vel, des_angvel, w, qc_weight = ctrl2components(act, ids)
+    qacc_c, com_accs = highlvlPD(data, des_pos, des_com_vel, des_angvel, ids)
+    m, h, jacs, jvp, jac_com, com_jvp, eefpos, com_pos = lmodel.get_kin_values(
+        model, data, ids, is_mjx = is_mjx)
+    a_stc = jnp.zeros(6 * ids["eef_num"])
+    u = centroidal_qp(m, w,
+                eefpos, com_pos,
+                jacs,
+                com_accs, ids = ids)
+    return u
 
 def default_act(ids):
     des_pos = jnp.zeros([ids["ctrl_num"]])
@@ -369,13 +455,13 @@ def test_act_move_com(com_pos, data, t, ids):
 
     
     delta = jnp.array([0.0, t, 0.0])
-    delta = jnp.sin(delta) * 0.04
+    delta = jnp.sin(delta) * 0.03
 
     com_pos += delta
 
     point_vec = com_pos - current_com
 
-    vel_ = point_vec * 1.0
+    vel_ = point_vec * 5.0
     vel_mag_norm = jnp.clip(jnp.linalg.norm(vel_), min = 0.0, max = 0.5)
     vel_ = vel_ * vel_mag_norm / (jnp.linalg.norm(vel_) + 1e-6)
 
@@ -390,7 +476,7 @@ def test_act_move_com(com_pos, data, t, ids):
 
     ang_disp = lmath.angular_displacement_from_A_to_B(A, B)
 
-    ang_vel = ang_disp * 1.0
+    ang_vel = ang_disp * 3.0
 
     ang_vel_norm = jnp.clip(jnp.linalg.norm(ang_vel), min = 0.0, max = 3.0)
 
