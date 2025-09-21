@@ -58,7 +58,16 @@ def jac_com(m, d):
     J_com = jac_trans.T 
     return J_com
 
+def com_pos_fn(qpos, mjx_model, mjx_data):
+    d = mjx_data.replace(qpos=qpos)
+    # Ensure kinematics are updated; if mjx has a pure forward kinematics util, use it.
+    d = mjx.step(mjx_model, d)  # with zero ctrl/vel this updates kinematics
+    root = mjx_model.body_rootid[1]
+    return d.subtree_com[root]
 
+def jac_com_mjx(model, data):
+    J = jax.jacrev(lambda q: com_pos_fn(q, model, data))(data.qpos)
+    return J
 
 def get_mh(mj_model, mj_data, ids, is_mjx = True):
     """
@@ -91,6 +100,7 @@ def get_kin_values(model, data, ids, is_mjx = True):
     m, h = get_mh(model, data, ids, is_mjx = is_mjx)
     if is_mjx:
         com_jvp, jvp_ = jvp.get_djp(model, data, ids)
+        #jac_com_ = jnp.ones([3, model.nv])
         jac_com_ = jac_com(model, data)
     else:
         jvp_ = get_djp_mj(model, data, ids)

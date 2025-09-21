@@ -21,6 +21,8 @@ def _time_jitted(name: str, fn: Callable, args: Tuple, reps: int = 50) -> float:
     jf = jax.jit(fn)
     out = jf(*args)
     _block_until_ready(out)
+    for _ in range(5):
+        res = jf(*args)
     t0 = time.perf_counter()
     res = None
     for _ in range(reps):

@@ -103,8 +103,7 @@ def default_config() -> config_dict.ConfigDict:
               collision=-1.0,
               pbc_w=-1.0,
               qp_weight=0.05,
-              frc_equiv=0.25,
-              des_vel=-2.0
+              select=0.25
           ),
           tracking_sigma=0.25,
           max_foot_height=0.12,
@@ -589,14 +588,18 @@ class Joystick(t1_base.T1Env):
         "feet_distance": self._cost_feet_distance(data, info),
         "pbc_w": self._cost_pbc_w(action, contact),
         "qp_weight": self._reward_weight_logit_weight(action),
-        "frc_equiv": self._reward_frc_equiv(data, action),
-        "des_vel": self._reward_des_vel(action)
+        "select": self._reward_select(action),
     }
   
+  def _reward_select(self, action):
+    logits = ctrl2logits(action, bids.ids)
+    mean_weight = jp.mean(nn.sigmoid(logits["pd_weight"]))
+    return mean_weight
+  
   def _reward_des_vel(self, action):
-    des_pos, des_com_vel, des_com_angvel, w, qc_weight_logit = ctrl2logits(action, bids.ids)
-    des_vel_mag = jp.linalg.norm(des_com_vel)
-    des_angvel_mag = jp.linalg.norm(des_com_angvel)
+    logits = ctrl2logits(action, bids.ids)
+    des_vel_mag = jp.linalg.norm(logits["des_com_vel"])
+    des_angvel_mag = jp.linalg.norm(logits["des_com_angvel"])
     des_vel_cap = 0.5
     des_angvel_cap = 2.0
     des_vel_rew = jp.clip(des_vel_mag - des_vel_cap,
@@ -618,17 +621,17 @@ class Joystick(t1_base.T1Env):
   
   # Tracking rewards.
   def _reward_weight_logit_weight(self, action):
-    des_pos, des_com_vel, des_com_angvel, w, qc_weight_logit = ctrl2logits(action, bids.ids)
+    logits = ctrl2logits(action, bids.ids)
 
-    rew = jp.sum(jp.square(qc_weight_logit))
+    rew = jp.sum(jp.square(logits["qc_weight"]))
     rew = jp.exp(-rew / 2.0)
 
     return rew
 
   def _cost_pbc_w(self, action, contact):
-    des_pos, des_com_vel, des_com_angvel, w, qc_weight_logit = ctrl2logits(action, bids.ids)
+    logits = ctrl2logits(action, bids.ids)
 
-    return rewards.reward_pbc_w_leg_only(w, contact)
+    return rewards.reward_pbc_w_leg_only(logits["w"], contact)
 
   def _reward_tracking_lin_vel(
       self,

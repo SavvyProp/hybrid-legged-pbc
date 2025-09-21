@@ -125,7 +125,7 @@ def maqp(m, h, w, a_stc,
     s = nn.sigmoid(w)
     
     # q_ddot_com, q_ddot_uc, F
-    weights = jnp.array([10000.0, 1000.0, 1.0, 0.1, 0.01, 0.01])
+    weights = jnp.array([10000.0, 1000.0, 1.0, 10.0, 0.1, 0.01])
     mat_height = 6 + 6 + ids["ctrl_num"] + 6 * ids["eef_num"]
     uc_size = ids["ctrl_num"] + 6
     F_size = ids["eef_num"] * 6
@@ -324,22 +324,41 @@ def ctrl2logits(act, ids):
     des_com_angvel = act[ids["ctrl_num"] + 3 : ids["ctrl_num"] + 6]
     w = act[ids["ctrl_num"] + 6 : ids["ctrl_num"] + ids["eef_num"] + 6]
     qc_weight = act[ids["ctrl_num"] + ids["eef_num"] + 6 : ids["ctrl_num"] * 2 + ids["eef_num"] + 6]
-    return des_pos, des_com_vel, des_com_angvel, w, qc_weight
+    pd_weight = act[ids["ctrl_num"] * 2 + ids["eef_num"] + 6:ids["ctrl_num"] * 3 + ids["eef_num"] + 6]
+    logits = {
+        "des_pos": des_pos,
+        "des_com_vel": des_com_vel,
+        "des_com_angvel": des_com_angvel,
+        "w": w,
+        "qc_weight": qc_weight,
+        "pd_weight": pd_weight
+    }
+    return logits
 
 def ctrl2components(act, ids):
     # des_pos, des_com_pos, w
-    des_pos, des_com_vel, des_com_angvel, w, qc_weight_logit = ctrl2logits(act, ids)
-    des_pos = ids["default_qpos"][7:] + jnp.tanh(des_pos) * 1.0
-    #des_angvel = jnp.tanh(des_com_angvel) * 3.0
-    #des_com_vel = jnp.tanh(des_com_vel) * 5.0
-    qc_weight = nn.sigmoid(qc_weight_logit)
-    return des_pos, des_com_vel, des_com_angvel, w, qc_weight
+    logits = ctrl2logits(act, ids)
+    des_pos = ids["default_qpos"][7:] + jnp.tanh(logits["des_pos"]) * 1.0
+    des_angvel = jnp.tanh(logits["des_com_angvel"]) * 1.0
+    des_com_vel = jnp.tanh(logits["des_com_vel"]) * 0.7
+    qc_weight = nn.sigmoid(logits["qc_weight"])
+    w = logits["w"]
+    pd_weight = nn.sigmoid(logits["pd_weight"])
+    outputs = {
+        "des_pos": des_pos,
+        "des_com_vel": des_com_vel,
+        "des_com_angvel": des_angvel,
+        "w": w,
+        "qc_weight": qc_weight,
+        "pd_weight": pd_weight
+    }
+    return outputs
 
 def highlvlPD(data, des_pos, des_com_vel, des_angvel, ids):
     qpos = data.qpos[ids["joint_pos_ids"]]
     qvel = data.qvel[ids["joint_vel_ids"]]
 
-    jp_gain = 200.0
+    jp_gain = 400.0
     jd_gain = 20.0
 
     qacc = jp_gain * (des_pos - qpos[7:]) - jd_gain * qvel[6:]
@@ -355,7 +374,14 @@ def highlvlPD(data, des_pos, des_com_vel, des_angvel, ids):
     return qacc, com_accs
 
 def step(model, data, act, ids, is_mjx = False):
-    des_pos, des_com_vel, des_angvel, w, qc_weight = ctrl2components(act, ids)
+    output = ctrl2components(act, ids)
+    des_pos = output["des_pos"]
+    des_com_vel = output["des_com_vel"]
+    des_angvel = output["des_com_angvel"]
+    w = output["w"]
+    qc_weight = output["qc_weight"]
+    pd_weight = output["pd_weight"]
+    
     qacc_c, com_accs = highlvlPD(data, des_pos, des_com_vel, des_angvel, ids)
     m, h, jacs, jvp, jac_com, com_jvp, eefpos, com_pos = lmodel.get_kin_values(
         model, data, ids, is_mjx = is_mjx)
@@ -368,6 +394,17 @@ def step(model, data, act, ids, is_mjx = False):
                 com_accs, qacc_c,
                 qc_weight, ids, is_mjx = is_mjx)
     u = jnp.nan_to_num(u, posinf = 0.0, neginf = 0.0, nan = 0.0)
+
+    p_weight = ids["p_gains"]
+    d_weight = ids["d_gains"]
+
+    qpos = data.qpos[ids["joint_pos_ids"]][7:]
+    qvel = data.qvel[ids["joint_vel_ids"]][6:]
+
+    pd_tau = p_weight * (des_pos - qpos) + d_weight * (0.0 - qvel)
+
+    u = u * (pd_weight) + pd_tau * (1.0 - pd_weight)
+
     tau_limits = ids["tau_limits"]
     u = jnp.clip(u, -tau_limits, tau_limits)
     return u
@@ -388,7 +425,11 @@ def get_frc(model, data, act, ids, is_mjx = False):
     return f
 
 def step_centroidal(model, data, act, ids, is_mjx = False):
-    des_pos, des_com_vel, des_angvel, w, qc_weight = ctrl2components(act, ids)
+    output = ctrl2components(act, ids)
+    des_pos = output["des_pos"]
+    des_com_vel = output["des_com_vel"]
+    des_angvel = output["des_com_angvel"]
+    w = output["w"]
     qacc_c, com_accs = highlvlPD(data, des_pos, des_com_vel, des_angvel, ids)
     m, h, jacs, jvp, jac_com, com_jvp, eefpos, com_pos = lmodel.get_kin_values(
         model, data, ids, is_mjx = is_mjx)

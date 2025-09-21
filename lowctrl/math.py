@@ -67,6 +67,7 @@ def com_pos(mjx_model, mjx_data):
     total_mass = jnp.sum(mjx_model.body_mass)
     com = jnp.sum(mjx_model.body_mass[:, None] * mjx_data.xipos, # (nbody,1)*(nbody,3)
              axis=0) / total_mass  
+    #com = mjx_data.subtree_com[0]
     return com
 
 def vec2diags(v, ids):

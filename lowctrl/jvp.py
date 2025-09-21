@@ -30,6 +30,7 @@ def get_djp(mjx_model, mjx_data, ids):
                 poslist.append(point)
                 orienlist.append(orien)
             com_pos = lmath.com_pos(mjx_model, d)
+            #com_pos = jnp.zeros([3,])
             return com_pos, poslist, orienlist
         _, (com_pos, poslist, angmatlist) = jax.jvp(get_fik, (qpos1, ), (qdot_qpos, ))
 

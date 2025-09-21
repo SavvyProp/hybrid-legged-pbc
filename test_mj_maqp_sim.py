@@ -24,10 +24,6 @@ t = 0
 def step_fn(mj_model, mj_state, t):
     #act = maqp.default_act(bids.ids)
     act = maqp.test_act_move_com(init_com, data, t, bids.ids)
-    pos = bids.ids["default_qpos"][7:]
-    pos = pos.at[2].set(jnp.sin(t) * 0.4)
-    pos = pos.at[6].set(jnp.sin(t) * 0.4)
-    
     ctrl = maqp.step(mj_model, mj_state, act, bids.ids, is_mjx = False)
     ctrl2 = maqp.step_centroidal(mj_model, mj_state, act, bids.ids, is_mjx = False)
     print("ctrls", ctrl[11:], ctrl2[11:])
