@@ -324,7 +324,8 @@ def ctrl2logits(act, ids):
     des_com_angvel = act[ids["ctrl_num"] + 3 : ids["ctrl_num"] + 6]
     w = act[ids["ctrl_num"] + 6 : ids["ctrl_num"] + ids["eef_num"] + 6]
     qc_weight = act[ids["ctrl_num"] + ids["eef_num"] + 6 : ids["ctrl_num"] * 2 + ids["eef_num"] + 6]
-    pd_weight = act[ids["ctrl_num"] * 2 + ids["eef_num"] + 6:ids["ctrl_num"] * 3 + ids["eef_num"] + 6]
+    pd_weight = act[ids["ctrl_num"] * 2 + ids["eef_num"] + 6:
+                    ids["ctrl_num"] * 3 + ids["eef_num"] + 6]
     logits = {
         "des_pos": des_pos,
         "des_com_vel": des_com_vel,
@@ -448,7 +449,8 @@ def default_act(ids):
     w = jnp.array([10., 10., -5., -5.])
     qc_weight = jnp.ones([ids["ctrl_num"]]) * -1
     qc_weight = qc_weight.at[0:11].set(1.0)
-    act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w, qc_weight], axis = 0)
+    pd_weight = jnp.ones([ids["ctrl_num"]]) * 2.0
+    act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w, qc_weight, pd_weight], axis = 0)
     return act
 
 def default_act_lock_com(com_pos, data, ids):
