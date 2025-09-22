@@ -589,7 +589,7 @@ class Joystick(t1_base.T1Env):
         "qp_weight": self._reward_weight_logit_weight(action),
         "select": self._reward_select(action),
         "maqp_cons": self._reward_maqp_cons(data, action),
-        "vel_def": self._reward_des_vel(action, info["last_act"]),
+        "vel_def": self._reward_des_vel(action),
         "vel_action_rate": self._cost_vel_action_rate(action, info["last_act"]),
     }
   
