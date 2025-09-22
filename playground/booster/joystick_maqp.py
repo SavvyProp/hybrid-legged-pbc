@@ -29,7 +29,7 @@ from mujoco_playground._src import mjx_env
 from mujoco_playground._src.locomotion.t1 import t1_constants as consts
 from playground.booster import base_maqp as t1_base
 from rewards import rewards
-from lowctrl.maqp import ctrl2logits, default_act, get_frc
+from lowctrl.maqp import ctrl2logits, default_act
 from lowctrl import maqp
 from rewards.mjx_col import get_contacts, get_forces
 from flax import linen as nn
@@ -123,10 +123,6 @@ def default_config() -> config_dict.ConfigDict:
   )
 
 from models.booster_t1_pgnd import booster_ids as bids
-@jax.jit
-def get_frc_pbc(mjx_model, state, act):
-    f = get_frc(mjx_model, state, act, bids.ids, is_mjx = True)
-    return f
 
 class Joystick(t1_base.T1Env):
   """Track a joystick command."""
@@ -610,7 +606,8 @@ class Joystick(t1_base.T1Env):
   
   def _reward_frc_equiv(self, data, action):
     l_true, r_true = get_forces(data, self.ids)
-    f = get_frc_pbc(self._mjx_model, data, action)
+    #f = get_frc_pbc(self._mjx_model, data, action)
+    f = jp.zeros([24]) # Placeholder
     lf = f[0:3]
     rf = f[6:9]
     fac = 20000

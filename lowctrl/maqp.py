@@ -260,7 +260,7 @@ def maqp(m, h, w, a_stc,
 
         print("cons_mul: ", cons_lhs @ sol - cons_rhs)
 
-    return ub, f
+    return ub, f, q_ddot_com
 
 
 def centroidal_qp(m, w,
@@ -316,7 +316,7 @@ def centroidal_qp(m, w,
 
     leg_tau = jacs[:12, 6:].T @ f
 
-    return leg_tau
+    return leg_tau, q_ddot_com
 
 def ctrl2logits(act, ids):
     des_pos = act[0:ids["ctrl_num"]]
@@ -362,19 +362,21 @@ def highlvlPD(data, des_pos, des_com_vel, des_angvel, ids):
     jp_gain = 400.0
     jd_gain = 20.0
 
+    world_com_vel = lmath.rotate_des_com_vel(des_com_vel, data)
+
     qacc = jp_gain * (des_pos - qpos[7:]) - jd_gain * qvel[6:]
 
-    c_lin_p_gain = 50.0
-    com_acc = c_lin_p_gain * (des_com_vel - qvel[0:3])
+    c_lin_p_gain = 5.0
+    com_acc = c_lin_p_gain * (world_com_vel - qvel[0:3])
     
-    c_ang_p_gain = 10.0
+    c_ang_p_gain = 0.5
     com_angacc = c_ang_p_gain * (des_angvel - qvel[3:6])
 
     com_accs = jnp.concatenate([com_acc, com_angacc], axis = 0)
 
     return qacc, com_accs
 
-def step(model, data, act, ids, is_mjx = False):
+def step(model, data, act, ids, is_mjx = False, debug = False):
     output = ctrl2components(act, ids)
     des_pos = output["des_pos"]
     des_com_vel = output["des_com_vel"]
@@ -388,7 +390,7 @@ def step(model, data, act, ids, is_mjx = False):
         model, data, ids, is_mjx = is_mjx)
     a_stc = jnp.zeros(6 * ids["eef_num"])
     #s = jnp.where(nn.sigmoid(w) > 0.5, 1.0, 0.0)
-    u, f = maqp(m, h, w, a_stc,
+    u, f, q_ddot_com = maqp(m, h, w, a_stc,
                 eefpos, com_pos,
                 jacs, jvp,
                 jac_com, com_jvp,
@@ -404,26 +406,25 @@ def step(model, data, act, ids, is_mjx = False):
 
     pd_tau = p_weight * (des_pos - qpos) + d_weight * (0.0 - qvel)
 
-    u = u * (pd_weight) + pd_tau * (1.0 - pd_weight)
+    u_final = u * (pd_weight) + pd_tau * (1.0 - pd_weight)
 
     tau_limits = ids["tau_limits"]
-    u = jnp.clip(u, -tau_limits, tau_limits)
-    return u
+    u_final = jnp.clip(u_final, -tau_limits, tau_limits)
+    if debug:
+        debug_info = {
+            "pd_tau": pd_tau,
+            "u": u,
+            "f": f,
+            "q_ddot_com": q_ddot_com,
+            "com_ref": com_accs,
+            "des_com_vel": des_com_vel,
+            "des_angvel": des_angvel,
+            "real_com_vel": data.qvel[0:3],
+        }
+        return debug_info
+    else:
+        return u_final
 
-def get_frc(model, data, act, ids, is_mjx = False):
-    des_pos, des_com_vel, des_angvel, w, qc_weight = ctrl2components(act, ids)
-    qacc_c, com_accs = highlvlPD(data, des_pos, des_com_vel, des_angvel, ids)
-    m, h, jacs, jvp, jac_com, com_jvp, eefpos, com_pos = lmodel.get_kin_values(
-        model, data, ids, is_mjx = is_mjx)
-    a_stc = jnp.zeros(6 * ids["eef_num"])
-    #s = jnp.where(nn.sigmoid(w) > 0.5, 1.0, 0.0)
-    u, f = maqp(m, h, w, a_stc,
-                eefpos, com_pos,
-                jacs, jvp,
-                jac_com, com_jvp,
-                com_accs, qacc_c,
-                qc_weight, ids, is_mjx = is_mjx)
-    return f
 
 def step_centroidal(model, data, act, ids, is_mjx = False):
     output = ctrl2components(act, ids)
@@ -505,8 +506,8 @@ def test_act_move_com(com_pos, data, t, ids):
 
     point_vec = com_pos - current_com
 
-    vel_ = point_vec * 5.0
-    vel_mag_norm = jnp.clip(jnp.linalg.norm(vel_), min = 0.0, max = 0.5)
+    vel_ = point_vec * 50.0
+    vel_mag_norm = jnp.clip(jnp.linalg.norm(vel_), min = 0.0, max = 3.0)
     vel_ = vel_ * vel_mag_norm / (jnp.linalg.norm(vel_) + 1e-6)
 
     des_com_vel = vel_

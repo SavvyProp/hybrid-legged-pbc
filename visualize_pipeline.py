@@ -1,36 +1,32 @@
-from datetime import datetime
-import functools
 from brax.training.agents.ppo import train as ppo
 from brax.training.agents.ppo import networks as ppo_networks
 from brax.io import model
-from matplotlib import pyplot as plt
-from envs.booster_flatwalk_pd import FlatwalkEnv, metrics_dict
-import os
 import jax
 import mujoco
 import mujoco.mjx as mjx
 import mujoco.viewer
 import jax.numpy as jnp
-import numpy as np
 from brax.training.acme import running_statistics
 #from playground.booster import joystick
-from playground.booster import joystick_pbc as joystick
+from playground.booster import joystick_maqp as joystick
 from playground.booster.config import ppo_params
-from lowctrl.eefpbc import ctrl2components
-import lowctrl.eefpbc as eefpbc
 from models.booster_t1_pgnd.booster_ids import ids
 from rewards.mjx_col import get_forces
+from lowctrl import maqp
 
 env = joystick.Joystick()
 
 jit_reset = jax.jit(env.reset)
 jit_step = jax.jit(env.step)
+# JIT maqp.step by closing over non-array args (model, ids, flags)
+@jax.jit
+def jit_maqp_step(mjx_state, act):
+    return maqp.step(env._mjx_model, mjx_state, act, ids, is_mjx=True, debug=True)
 state = jit_reset(jax.random.PRNGKey(0))
 
 def makeIFN():
     from brax.training.agents.ppo import networks as ppo_networks
     import functools
-    import networks.mlp as mlp
     network_factory = functools.partial(
         ppo_networks.make_ppo_networks,
         **ppo_params.network_factory
@@ -47,26 +43,19 @@ def makeIFN():
 
 #jit_debug_step = jax.jit(eefpbc.debug_step)
 from models.booster_t1_pgnd.booster_ids import ids
+import numpy as np
+array_dict = {}
 
-@jax.jit
-def get_frc(mjx_model, state, act):
-    f, qu = eefpbc.get_frc(mjx_model, state, act, ids)
-    return f, qu
+def debug_eefpbc(state, act, i):
+    logits = maqp.ctrl2logits(act, ids)
+    debug_dict = jit_maqp_step(state, act)
+    for key in debug_dict:
+        if key not in array_dict:
+            array_dict[key] = np.zeros([1000] + list(debug_dict[key].shape))
+        array_dict[key][i, :] = np.array(debug_dict[key])
+    print("logits qp_weight:", logits["qc_weight"])
 
-def debug_eefpbc(state, act):
-    (des_pos, 
-     qp_weights, 
-     w, oriens, 
-    ) = ctrl2components(act, ids)
-    left_forces, right_forces = get_forces(state, ids)
-    print("left forces", left_forces)
-    print("right forces", right_forces)
-    f, q_u = get_frc(env._mjx_model, state, act)
-    print("f", f[0:3], f[6:9])
-    q_acc = state.qacc
-    print("qddot_u", q_acc[0:3])
-
-dir = "training/test_pbc_12"
+dir = "training/test_maqp_1"
 
 model_path = dir + "/walk_policy"
 saved_params = model.load_params(model_path)
@@ -99,9 +88,7 @@ for c in range(1000):
     pipeline_state = state.data
     #print(state.data.contact)
     print(state.info["last_contact"])
-    debug_eefpbc(state.data, ctrl)
-
-    print(state.metrics["reward/frc_equiv"])
+    debug_eefpbc(state.data, ctrl, c)
     #print(ids["col"])
     #print(state.data.sensordata)
     #debug_eefpbc(ctrl)
@@ -112,7 +99,8 @@ for c in range(1000):
     states += [state]
     pipeline_state_list += [pipeline_state]
 
-
+for key in array_dict:
+    np.savetxt(f"data/{key}.csv", array_dict[key].reshape(1000, -1), delimiter=",")
 print("Rollout precomputed")
 
 viewer = mujoco.viewer.launch_passive(mj_model, data)

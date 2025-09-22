@@ -131,3 +131,50 @@ def angular_displacement_from_A_to_B(A, B):
     # delta q such that B = dq ⊗ A  =>  dq = B ⊗ conj(A)
     dq = _qmul(B, _qconj(A))
     return _quat_to_rotvec(_qnormalize(dq))
+
+def quat_wxyz_to_R(q):
+    """Return 3x3 rotation matrix from MuJoCo-style quaternion q=(w,x,y,z).
+    Supports shapes (4,) or (...,4) and returns (...,3,3) or (3,3).
+    """
+    q = jnp.asarray(q)
+    w, x, y, z = q[..., 0], q[..., 1], q[..., 2], q[..., 3]
+    # normalize to be safe
+    n = jnp.sqrt(w*w + x*x + y*y + z*z) + 1e-12
+    w, x, y, z = w/n, x/n, y/n, z/n
+    xx, yy, zz = x*x, y*y, z*z
+    xy, xz, yz = x*y, x*z, y*z
+    wx, wy, wz = w*x, w*y, w*z
+    r00 = 1.0 - 2.0*(yy + zz)
+    r01 = 2.0*(xy - wz)
+    r02 = 2.0*(xz + wy)
+    r10 = 2.0*(xy + wz)
+    r11 = 1.0 - 2.0*(xx + zz)
+    r12 = 2.0*(yz - wx)
+    r20 = 2.0*(xz - wy)
+    r21 = 2.0*(yz + wx)
+    r22 = 1.0 - 2.0*(xx + yy)
+    R = jnp.stack([
+        jnp.stack([r00, r01, r02], axis=-1),
+        jnp.stack([r10, r11, r12], axis=-1),
+        jnp.stack([r20, r21, r22], axis=-1),
+    ], axis=-2)
+    return R
+
+
+def rotate_des_com_vel_from_q(des_com_vel_base, base_quat_wxyz):
+    """Rotate COM velocity from base frame to world frame using a quaternion.
+    des_com_vel_base: (...,3)
+    base_quat_wxyz: (...,4) MuJoCo w,x,y,z orientation of base in world
+    Returns (...,3) in world frame.
+    """
+    R = quat_wxyz_to_R(base_quat_wxyz)  # (...,3,3)
+    v = jnp.asarray(des_com_vel_base)
+    return jnp.einsum('...ij,...j->...i', R, v)
+
+
+def rotate_des_com_vel(des_com_vel_base, data):
+    """Rotate COM velocity from base frame to world using data.qpos[3:7].
+    Works with MuJoCo MjData or MJX data objects that expose .qpos.
+    """
+    q = data.qpos[3:7]
+    return rotate_des_com_vel_from_q(des_com_vel_base, q)
