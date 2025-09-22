@@ -103,7 +103,8 @@ def default_config() -> config_dict.ConfigDict:
               collision=-1.0,
               pbc_w=-1.0,
               qp_weight=0.05,
-              select=0.25
+              select=0.25,
+              maqp_cons=0.10
           ),
           tracking_sigma=0.25,
           max_foot_height=0.12,
@@ -585,6 +586,7 @@ class Joystick(t1_base.T1Env):
         "pbc_w": self._cost_pbc_w(action, contact),
         "qp_weight": self._reward_weight_logit_weight(action),
         "select": self._reward_select(action),
+        "maqp_cons": self.reward_maqp_cons(data, action)
     }
   
   def _reward_select(self, action):
@@ -604,17 +606,29 @@ class Joystick(t1_base.T1Env):
                            min = 0.0, max = None)
     return des_vel_rew + des_angvel_rew * 0.25
   
-  def _reward_frc_equiv(self, data, action):
+  def _reward_maqp_cons(self, data, action):
+    debug_dict = maqp.step(self._mjx_model, 
+                           data, action, self.ids, 
+                           is_mjx=True, debug=True)
+    f = debug_dict["f"]
     l_true, r_true = get_forces(data, self.ids)
     #f = get_frc_pbc(self._mjx_model, data, action)
-    f = jp.zeros([24]) # Placeholder
+    #f = jp.zeros([24]) # Placeholder
     lf = f[0:3]
     rf = f[6:9]
     fac = 20000
     left_frc_error = jp.sum(jp.square(lf - l_true)) / fac
     right_frc_error = jp.sum(jp.square(rf - r_true)) / fac
     frc_error = left_frc_error + right_frc_error
-    return jp.exp(-frc_error)
+    frc_rew = jp.exp(-frc_error)
+
+    u = debug_dict["u"]
+    tau_limits = self.ids["tau_limits"]
+    torque_sum = jp.sum(jp.clip(jp.abs(tau_limits) - jp.abs(u), 
+                                None, 0.0))
+    torque_lim_rew = jp.exp(torque_sum / 100.0)
+
+    return torque_lim_rew * 5 + frc_rew
   
   # Tracking rewards.
   def _reward_weight_logit_weight(self, action):

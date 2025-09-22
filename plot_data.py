@@ -23,8 +23,8 @@ def main():
     des_com_vel = load_matrix(os.path.join('data', 'des_com_vel.csv'))
     des_com_angvel = load_matrix(os.path.join('data', 'des_angvel.csv'))
 
-    #plt.plot(pd_tau[:, 11])
-    #plt.plot(u[:, 11])
+    plt.plot(pd_tau[:, 11])
+    plt.plot(u[:, 11])
     lf_mag = np.linalg.norm(f[:, 0:3], axis=1)
     lt_mag = np.linalg.norm(f[:, 3:6], axis=1)
     rf_mag = np.linalg.norm(f[:, 6:9], axis=1)
@@ -43,7 +43,7 @@ def main():
     #plt.plot(com_ref[range_lower:range_upper, 2], label='ref z')
     #plt.plot(real_com_vel[range_lower:range_upper, 2], label='real z')
     #plt.plot(des_com_vel[range_lower:range_upper, 2], label='des z')
-    plt.plot(des_com_angvel[range_lower:range_upper, 2], label='des yaw')
+    #plt.plot(des_com_angvel[range_lower:range_upper, 2], label='des yaw')
     plt.show()
 
 if __name__ == '__main__':

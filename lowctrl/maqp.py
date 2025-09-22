@@ -340,8 +340,14 @@ def ctrl2components(act, ids):
     # des_pos, des_com_pos, w
     logits = ctrl2logits(act, ids)
     des_pos = ids["default_qpos"][7:] + jnp.tanh(logits["des_pos"]) * 1.0
-    des_angvel = jnp.tanh(logits["des_com_angvel"]) * 1.0
-    des_com_vel = jnp.tanh(logits["des_com_vel"]) * 0.7
+    #des_angvel = jnp.tanh(logits["des_com_angvel"]) * 1.0
+    des_angvel = logits["des_com_angvel"] * 0.05
+    des_angvel_mag = jnp.clip(jnp.linalg.norm(des_angvel), 0.0, 1.0)
+    des_angvel = des_angvel * (des_angvel_mag / (1e-6 + jnp.linalg.norm(des_angvel)))
+    #des_com_vel = jnp.tanh(logits["des_com_vel"]) * 0.7
+    des_com_vel = logits["des_com_vel"] * 0.05
+    des_com_vel_mag = jnp.clip(jnp.linalg.norm(des_com_vel), 0.0, 0.7)
+    des_com_vel = des_com_vel * (des_com_vel_mag / (1e-6 + jnp.linalg.norm(des_com_vel)))
     qc_weight = nn.sigmoid(logits["qc_weight"])
     w = logits["w"]
     pd_weight = nn.sigmoid(logits["pd_weight"])
@@ -369,7 +375,7 @@ def highlvlPD(data, des_pos, des_com_vel, des_angvel, ids):
     c_lin_p_gain = 5.0
     com_acc = c_lin_p_gain * (world_com_vel - qvel[0:3])
     
-    c_ang_p_gain = 0.5
+    c_ang_p_gain = 1.0
     com_angacc = c_ang_p_gain * (des_angvel - qvel[3:6])
 
     com_accs = jnp.concatenate([com_acc, com_angacc], axis = 0)
