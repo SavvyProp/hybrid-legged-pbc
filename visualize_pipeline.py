@@ -55,7 +55,7 @@ def debug_eefpbc(state, act, i):
         array_dict[key][i, :] = np.array(debug_dict[key])
     print("logits qp_weight:", logits["qc_weight"])
 
-dir = "training/test_maqp_2"
+dir = "training/test_maqp_3"
 
 model_path = dir + "/walk_policy"
 saved_params = model.load_params(model_path)

@@ -23,26 +23,28 @@ def main():
     des_com_vel = load_matrix(os.path.join('data', 'des_com_vel.csv'))
     des_com_angvel = load_matrix(os.path.join('data', 'des_angvel.csv'))
 
-    plt.plot(pd_tau[:, 11])
-    plt.plot(u[:, 11])
+    range_lower = 100
+    range_upper = 200
+    
+    #plt.plot(pd_tau[range_lower:range_upper, 12])
+    #plt.plot(u[range_lower:range_upper, 12])
     lf_mag = np.linalg.norm(f[:, 0:3], axis=1)
     lt_mag = np.linalg.norm(f[:, 3:6], axis=1)
     rf_mag = np.linalg.norm(f[:, 6:9], axis=1)
     rt_mag = np.linalg.norm(f[:, 9:12], axis=1)
-    #plt.plot(lf_mag)
-    #plt.plot(rf_mag)
+    #plt.plot(lt_mag)
+    #plt.plot(rt_mag)
 
-    range_lower = 100
-    range_upper = 200
-
+    des_com_vel_mag = np.linalg.norm(des_com_vel, axis=1)
+    plt.plot(des_com_vel_mag)
     #plt.plot(q_ddot_com[:, 0], label='x')
     #plt.plot(q_ddot_com[:, 1], label='y')
     #plt.plot(q_ddot_com[:, 2], label='z')
     #plt.plot(com_ref[range_lower:range_upper, 0], label='ref x')
     #plt.plot(com_ref[range_lower:range_upper, 1], label='ref y')
     #plt.plot(com_ref[range_lower:range_upper, 2], label='ref z')
-    #plt.plot(real_com_vel[range_lower:range_upper, 2], label='real z')
-    #plt.plot(des_com_vel[range_lower:range_upper, 2], label='des z')
+    #plt.plot(real_com_vel[range_lower:range_upper, 0], label='real z')
+    #plt.plot(des_com_vel[range_lower:range_upper, 0], label='des z')
     #plt.plot(des_com_angvel[range_lower:range_upper, 2], label='des yaw')
     plt.show()
 

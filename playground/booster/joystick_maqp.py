@@ -104,7 +104,9 @@ def default_config() -> config_dict.ConfigDict:
               pbc_w=-1.0,
               qp_weight=0.05,
               select=0.25,
-              maqp_cons=0.10
+              maqp_cons=0.10,
+              vel_def=-2.0,
+              vel_action_rate = -0.01
           ),
           tracking_sigma=0.25,
           max_foot_height=0.12,
@@ -586,9 +588,24 @@ class Joystick(t1_base.T1Env):
         "pbc_w": self._cost_pbc_w(action, contact),
         "qp_weight": self._reward_weight_logit_weight(action),
         "select": self._reward_select(action),
-        "maqp_cons": self._reward_maqp_cons(data, action)
+        "maqp_cons": self._reward_maqp_cons(data, action),
+        "vel_def": self._reward_des_vel(action, info["last_act"]),
+        "vel_action_rate": self._cost_vel_action_rate(action, info["last_act"]),
     }
   
+  def _cost_vel_action_rate(
+      self, act: jax.Array, last_act: jax.Array
+  ) -> jax.Array:
+    vel_act = ctrl2logits(act, self.ids)["des_com_vel"]
+    angvel_act = ctrl2logits(act, self.ids)["des_com_angvel"]
+    vel_last_act = ctrl2logits(last_act, self.ids)["des_com_vel"]
+    angvel_last_act = ctrl2logits(last_act, self.ids)["des_com_angvel"]
+    c1 = jp.sum(jp.square(vel_act - 
+                          vel_last_act))
+    c2 = jp.sum(jp.square(angvel_act - 
+                          angvel_last_act))
+    return c1 + c2
+
   def _reward_select(self, action):
     logits = ctrl2logits(action, bids.ids)
     mean_weight = jp.mean(nn.sigmoid(logits["pd_weight"]))
@@ -596,15 +613,15 @@ class Joystick(t1_base.T1Env):
   
   def _reward_des_vel(self, action):
     logits = ctrl2logits(action, bids.ids)
-    des_vel_mag = jp.linalg.norm(logits["des_com_vel"])
-    des_angvel_mag = jp.linalg.norm(logits["des_com_angvel"])
-    des_vel_cap = 0.5
-    des_angvel_cap = 2.0
+    des_vel_mag = jp.linalg.norm(logits["des_com_vel"] * 0.05)
+    des_angvel_mag = jp.linalg.norm(logits["des_com_angvel"] * 0.05)
+    des_vel_cap = 0.7
+    des_angvel_cap = 1.0
     des_vel_rew = jp.clip(des_vel_mag - des_vel_cap,
                            min = 0.0, max = None)
     des_angvel_rew = jp.clip(des_angvel_mag - des_angvel_cap,
                            min = 0.0, max = None)
-    return des_vel_rew + des_angvel_rew * 0.25
+    return des_vel_rew + des_angvel_rew * 0.50
   
   def _reward_maqp_cons(self, data, action):
     debug_dict = maqp.step(self._mjx_model, 
@@ -694,8 +711,8 @@ class Joystick(t1_base.T1Env):
       self, act: jax.Array, last_act: jax.Array, last_last_act: jax.Array
   ) -> jax.Array:
     del last_last_act  # Unused.
-    c1 = jp.sum(jp.square(act[:self.ids["ctrl_num"]] - 
-                          last_act[:self.ids["ctrl_num"]]))
+    c1 = jp.sum(jp.square(act - 
+                          last_act))
     return c1
 
   def _cost_dof_acc(self, qacc: jax.Array) -> jax.Array:
