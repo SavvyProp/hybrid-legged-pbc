@@ -80,7 +80,7 @@ def default_config() -> config_dict.ConfigDict:
               base_height=0.0,
               # Energy related rewards.
               torques=0.0,
-              action_rate=-0.005,
+              action_rate=-0.001,
               energy=0.0,
               dof_acc=0.0,
               dof_vel=0.0,
@@ -105,8 +105,8 @@ def default_config() -> config_dict.ConfigDict:
               qp_weight=0.05,
               select=0.25,
               maqp_cons=0.10,
-              vel_def=-2.0,
-              vel_action_rate = -0.01
+              vel_def=0.25,
+              vel_action_rate = -0.005
           ),
           tracking_sigma=0.25,
           max_foot_height=0.12,
@@ -621,7 +621,7 @@ class Joystick(t1_base.T1Env):
                            min = 0.0, max = None)
     des_angvel_rew = jp.clip(des_angvel_mag - des_angvel_cap,
                            min = 0.0, max = None)
-    return des_vel_rew + des_angvel_rew * 0.50
+    return jp.exp(-(des_vel_rew + des_angvel_rew * 0.50))
   
   def _reward_maqp_cons(self, data, action):
     debug_dict = maqp.step(self._mjx_model, 
