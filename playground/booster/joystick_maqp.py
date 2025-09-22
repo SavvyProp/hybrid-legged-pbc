@@ -586,7 +586,7 @@ class Joystick(t1_base.T1Env):
         "pbc_w": self._cost_pbc_w(action, contact),
         "qp_weight": self._reward_weight_logit_weight(action),
         "select": self._reward_select(action),
-        "maqp_cons": self.reward_maqp_cons(data, action)
+        "maqp_cons": self._reward_maqp_cons(data, action)
     }
   
   def _reward_select(self, action):
