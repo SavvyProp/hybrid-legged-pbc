@@ -645,7 +645,11 @@ class Joystick(t1_base.T1Env):
                                 None, 0.0))
     torque_lim_rew = jp.exp(torque_sum / 100.0)
 
-    return torque_lim_rew * 5 + frc_rew
+    total_rew = torque_lim_rew * 5 + frc_rew
+
+    rew = jp.nan_to_num(total_rew, nan=-1.0, posinf=-1.0, neginf=-1.0)
+
+    return rew
   
   # Tracking rewards.
   def _reward_weight_logit_weight(self, action):
