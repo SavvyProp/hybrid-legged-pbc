@@ -92,7 +92,7 @@ def default_config() -> config_dict.ConfigDict:
               feet_phase=1.0,
               # Other rewards.
               stand_still=0.0,
-              alive=0.25,
+              alive=0.60,
               termination=0.0,
               # Pose related rewards.
               joint_deviation_knee=-0.1,
@@ -661,13 +661,14 @@ class Joystick(t1_base.T1Env):
     # maqp torque rate penalty
 
     u_action_rate = jp.sum(jp.square(u - info["last_u_act"]))
-
+    u_action_rate *= -0.0001
+    u_action_rate = jp.clip(u_action_rate, -0.50, 0.0)
     info["last_u_act"] = u
 
     total_rew = (torque_lim_rew * 0.50 + 
                  frc_rew * 0.10 + 
                  foot_torque_rew * 0.20 +
-                 u_action_rate * -0.0002)
+                 u_action_rate)
 
     rew = jp.nan_to_num(total_rew, nan=-1.0, posinf=-1.0, neginf=-1.0)
 
