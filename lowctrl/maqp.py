@@ -365,7 +365,7 @@ def highlvlPD(data, des_pos, des_com_vel, des_angvel, ids):
     qpos = data.qpos[ids["joint_pos_ids"]]
     qvel = data.qvel[ids["joint_vel_ids"]]
 
-    jp_gain = 200.0
+    jp_gain = 400.0
     jd_gain = 20.0
 
     world_com_vel = lmath.rotate_des_com_vel(des_com_vel, data)
