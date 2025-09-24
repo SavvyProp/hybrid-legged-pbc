@@ -104,7 +104,7 @@ def default_config() -> config_dict.ConfigDict:
               pbc_w=-1.0,
               qp_weight=0.05,
               select=0.25,
-              maqp_cons=0.10,
+              maqp_cons=1.0,
               vel_def=0.25,
               vel_action_rate = -0.005
           ),
@@ -287,11 +287,11 @@ class Joystick(t1_base.T1Env):
         maxval=self._config.push_config.interval_range[1],
     )
     push_interval_steps = jp.round(push_interval / self.dt).astype(jp.int32)
-
     info = {
         "rng": rng,
         "step": 0,
         "command": cmd,
+        "last_u_act": jp.zeros(self.ids["ctrl_num"]),
         "last_act": jp.zeros(self.action_size),
         "last_last_act": jp.zeros(self.action_size),
         #"motor_targets": jp.zeros(self.action_size),
@@ -588,7 +588,7 @@ class Joystick(t1_base.T1Env):
         "pbc_w": self._cost_pbc_w(action, contact),
         "qp_weight": self._reward_weight_logit_weight(action),
         "select": self._reward_select(action),
-        "maqp_cons": self._reward_maqp_cons(data, action),
+        "maqp_cons": self._reward_maqp_cons(data, info, action),
         "vel_def": self._reward_des_vel(action),
         "vel_action_rate": self._cost_vel_action_rate(action, info["last_act"]),
     }
@@ -623,7 +623,7 @@ class Joystick(t1_base.T1Env):
                            min = 0.0, max = None)
     return jp.exp(-(des_vel_rew + des_angvel_rew * 0.50))
   
-  def _reward_maqp_cons(self, data, action):
+  def _reward_maqp_cons(self, data, info, action):
     debug_dict = maqp.step(self._mjx_model, 
                            data, action, self.ids, 
                            is_mjx=True, debug=True)
@@ -645,7 +645,29 @@ class Joystick(t1_base.T1Env):
                                 None, 0.0))
     torque_lim_rew = jp.exp(torque_sum / 100.0)
 
-    total_rew = torque_lim_rew * 5 + frc_rew
+    # foot torque penalty method
+
+    lt = jp.linalg.norm(f[3:6])
+    rt = jp.linalg.norm(f[9:12])
+
+    def foot_torque_penalty(tau):
+      t2 = jp.clip(tau - 6.0, 0.0, None)
+      return jp.exp(-t2 / 10.0)
+    
+    lt_rew = foot_torque_penalty(lt)
+    rt_rew = foot_torque_penalty(rt)
+    foot_torque_rew = (lt_rew + rt_rew) / 2.0
+
+    # maqp torque rate penalty
+
+    u_action_rate = jp.sum(jp.square(u - info["last_u_act"]))
+
+    info["last_u_act"] = u
+
+    total_rew = (torque_lim_rew * 0.50 + 
+                 frc_rew * 0.10 + 
+                 foot_torque_rew * 0.20 +
+                 u_action_rate * -0.0002)
 
     rew = jp.nan_to_num(total_rew, nan=-1.0, posinf=-1.0, neginf=-1.0)
 
@@ -836,9 +858,6 @@ class Joystick(t1_base.T1Env):
     rz = gait.get_rz(phase, swing_height=foot_height)
     error = jp.sum(jp.square(foot_z - rz))
     reward = jp.exp(-error / 0.01)
-    # TODO(kevin): Ensure no movement at 0 command.
-    # cmd_norm = jp.linalg.norm(commands)
-    # reward *= cmd_norm > 0.1  # No reward for zero commands.
     return reward
 
   def _cost_feet_distance(

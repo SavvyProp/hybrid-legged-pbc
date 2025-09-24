@@ -365,7 +365,7 @@ def highlvlPD(data, des_pos, des_com_vel, des_angvel, ids):
     qpos = data.qpos[ids["joint_pos_ids"]]
     qvel = data.qvel[ids["joint_vel_ids"]]
 
-    jp_gain = 400.0
+    jp_gain = 200.0
     jd_gain = 20.0
 
     world_com_vel = lmath.rotate_des_com_vel(des_com_vel, data)
@@ -380,7 +380,7 @@ def highlvlPD(data, des_pos, des_com_vel, des_angvel, ids):
 
     com_accs = jnp.concatenate([com_acc, com_angacc], axis = 0)
 
-    return qacc, com_accs
+    return qacc, com_accs, world_com_vel
 
 def step(model, data, act, ids, is_mjx = False, debug = False):
     output = ctrl2components(act, ids)
@@ -391,7 +391,7 @@ def step(model, data, act, ids, is_mjx = False, debug = False):
     qc_weight = output["qc_weight"]
     pd_weight = output["pd_weight"]
     
-    qacc_c, com_accs = highlvlPD(data, des_pos, des_com_vel, des_angvel, ids)
+    qacc_c, com_accs, world_com_vel = highlvlPD(data, des_pos, des_com_vel, des_angvel, ids)
     m, h, jacs, jvp, jac_com, com_jvp, eefpos, com_pos = lmodel.get_kin_values(
         model, data, ids, is_mjx = is_mjx)
     a_stc = jnp.zeros(6 * ids["eef_num"])
@@ -423,7 +423,7 @@ def step(model, data, act, ids, is_mjx = False, debug = False):
             "f": f,
             "q_ddot_com": q_ddot_com,
             "com_ref": com_accs,
-            "des_com_vel": des_com_vel,
+            "des_com_vel": world_com_vel,
             "des_angvel": des_angvel,
             "real_com_vel": data.qvel[0:3],
         }
