@@ -127,7 +127,7 @@ def maqp(m, h, w, a_stc,
     s = nn.sigmoid(w)
     
     # q_ddot_com, q_ddot_uc, F
-    weights = jnp.array([10000.0, 1000.0, 1.0, 10.0, 0.1, 0.01])
+    weights = jnp.array([10000.0, 1000.0, 1.0, 100.0, 0.1, 0.01])
     mat_height = 6 + 6 + ids["ctrl_num"] + 6 * ids["eef_num"]
     uc_size = ids["ctrl_num"] + 6
     F_size = ids["eef_num"] * 6
@@ -343,8 +343,8 @@ def ctrl2components(act, ids):
     logits = ctrl2logits(act, ids)
     des_pos = ids["default_qpos"][7:] + jnp.tanh(logits["des_pos"]) * 1.0
     #des_angvel = jnp.tanh(logits["des_com_angvel"]) * 1.0
-    des_angvel = logits["des_com_angvel"] * 0.05
-    des_angvel_mag = jnp.clip(jnp.linalg.norm(des_angvel), 0.0, 2.0)
+    des_angvel = logits["des_com_angvel"] * 0.20
+    des_angvel_mag = jnp.clip(jnp.linalg.norm(des_angvel), 0.0, 3.0)
     des_angvel = des_angvel * (des_angvel_mag / (1e-6 + jnp.linalg.norm(des_angvel)))
     #des_com_vel = jnp.tanh(logits["des_com_vel"]) * 0.7
     des_com_vel = logits["des_com_vel"] * 0.05
@@ -367,8 +367,8 @@ def highlvlPD(data, des_pos, des_com_vel, des_angvel, ids):
     qpos = data.qpos[ids["joint_pos_ids"]]
     qvel = data.qvel[ids["joint_vel_ids"]]
 
-    jp_gain = 400.0
-    jd_gain = 20.0
+    jp_gain = 800.0
+    jd_gain = 40.0
 
     world_com_vel = lmath.rotate_des_com_vel(des_com_vel, data)
 
@@ -377,7 +377,7 @@ def highlvlPD(data, des_pos, des_com_vel, des_angvel, ids):
     c_lin_p_gain = 20.0
     com_acc = c_lin_p_gain * (world_com_vel - qvel[0:3])
     
-    c_ang_p_gain = 1.0
+    c_ang_p_gain = 4.0
     com_angacc = c_ang_p_gain * (des_angvel - qvel[3:6])
 
     com_accs = jnp.concatenate([com_acc, com_angacc], axis = 0)
@@ -457,8 +457,8 @@ def default_act(ids):
     des_com_angvel = jnp.zeros([3])
     #w = jnp.ones([ids["eef_num"]]) * 4.0
     w = jnp.array([10., 10., -5., -5.])
-    qc_weight = jnp.ones([ids["ctrl_num"]]) * -1
-    qc_weight = qc_weight.at[0:11].set(1.0)
+    qc_weight = jnp.ones([ids["ctrl_num"]]) * -4
+    qc_weight = qc_weight.at[0:11].set(4.0)
     pd_weight = jnp.ones([ids["ctrl_num"]]) * 2.0
     act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w, qc_weight, pd_weight], axis = 0)
     return act

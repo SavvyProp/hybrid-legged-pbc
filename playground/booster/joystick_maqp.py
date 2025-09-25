@@ -614,9 +614,9 @@ class Joystick(t1_base.T1Env):
   def _reward_des_vel(self, action):
     logits = ctrl2logits(action, bids.ids)
     des_vel_mag = jp.linalg.norm(logits["des_com_vel"] * 0.05)
-    des_angvel_mag = jp.linalg.norm(logits["des_com_angvel"] * 0.05)
+    des_angvel_mag = jp.linalg.norm(logits["des_com_angvel"] * 0.20)
     des_vel_cap = 0.7
-    des_angvel_cap = 2.0
+    des_angvel_cap = 3.0
     des_vel_rew = jp.clip(des_vel_mag - des_vel_cap,
                            min = 0.0, max = None)
     des_angvel_rew = jp.clip(des_angvel_mag - des_angvel_cap,
@@ -643,7 +643,7 @@ class Joystick(t1_base.T1Env):
     tau_limits = self.ids["tau_limits"]
     torque_sum = jp.sum(jp.clip(jp.abs(tau_limits) - jp.abs(u), 
                                 None, 0.0))
-    torque_lim_rew = jp.exp(torque_sum / 100.0)
+    torque_lim_rew = jp.exp(torque_sum / 50.0)
 
     # foot torque penalty method
 
@@ -667,7 +667,7 @@ class Joystick(t1_base.T1Env):
 
     total_rew = (torque_lim_rew * 0.50 + 
                  frc_rew * 0.10 + 
-                 foot_torque_rew * 0.50 +
+                 foot_torque_rew * 0.70 +
                  u_action_rate * 1.0)
 
     rew = jp.nan_to_num(total_rew, nan=-1.0, posinf=-1.0, neginf=-1.0)
