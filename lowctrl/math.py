@@ -80,6 +80,13 @@ def vec2diags(v, ids):
     D = D.at[rows[:, None] + jnp.arange(6)[None, :], cols[:, None] + jnp.arange(6)[None, :]].set(v[:, None])
     return D
 
+def torqueCost(torque_mul, ids):
+    flat_cost = jnp.ones(ids["eef_num"] * 6)
+    for i in range(ids["eef_num"]):
+        flat_cost = flat_cost.at[i * 6 + 3:i * 6 + 6].set(torque_mul)
+    cost = jnp.eye(ids["eef_num"] * 6)
+    cost = cost * flat_cost[None, :]
+    return cost
 
 
 def _qnormalize(q, eps=1e-12):

@@ -616,7 +616,7 @@ class Joystick(t1_base.T1Env):
     des_vel_mag = jp.linalg.norm(logits["des_com_vel"] * 0.05)
     des_angvel_mag = jp.linalg.norm(logits["des_com_angvel"] * 0.05)
     des_vel_cap = 0.7
-    des_angvel_cap = 1.0
+    des_angvel_cap = 2.0
     des_vel_rew = jp.clip(des_vel_mag - des_vel_cap,
                            min = 0.0, max = None)
     des_angvel_rew = jp.clip(des_angvel_mag - des_angvel_cap,

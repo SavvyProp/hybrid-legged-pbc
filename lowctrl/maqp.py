@@ -25,7 +25,7 @@ def make_centroidal_a(m, eefpos, com_pos, ids):
 # Functions to build minimization objectives
 
 def centroidal_acc_q(q_ddot_com_ref):
-    weight_vec = jnp.array([1.0, 1.0, 1.0, 1e-2, 1e-2, 1e-2])
+    weight_vec = jnp.array([1.0, 1.0, 1.0, 1e-1, 1e-1, 1e-1])
     big_c = jnp.eye(6) * weight_vec[None, :]
     big_q = big_c.T @ big_c
     small_q = big_c.T @ q_ddot_com_ref
@@ -43,6 +43,8 @@ def f_mag_q(w, ids):
     logits = -jnp.clip(w, -6.0, 6.0)
     big_qp = lmath.vec2diags(jnp.exp(logits), ids)
     big_qp += jnp.eye(6 * ids["eef_num"]) * 1
+    tau_cost = lmath.torqueCost(10.0, ids)
+    big_qp = tau_cost @ big_qp 
     return big_qp, jnp.zeros(6 * ids["eef_num"])
 
 def q_ddot_c_q(qc_weight, q_ddot_c_des, ids):
@@ -342,7 +344,7 @@ def ctrl2components(act, ids):
     des_pos = ids["default_qpos"][7:] + jnp.tanh(logits["des_pos"]) * 1.0
     #des_angvel = jnp.tanh(logits["des_com_angvel"]) * 1.0
     des_angvel = logits["des_com_angvel"] * 0.05
-    des_angvel_mag = jnp.clip(jnp.linalg.norm(des_angvel), 0.0, 1.0)
+    des_angvel_mag = jnp.clip(jnp.linalg.norm(des_angvel), 0.0, 2.0)
     des_angvel = des_angvel * (des_angvel_mag / (1e-6 + jnp.linalg.norm(des_angvel)))
     #des_com_vel = jnp.tanh(logits["des_com_vel"]) * 0.7
     des_com_vel = logits["des_com_vel"] * 0.05
@@ -372,7 +374,7 @@ def highlvlPD(data, des_pos, des_com_vel, des_angvel, ids):
 
     qacc = jp_gain * (des_pos - qpos[7:]) - jd_gain * qvel[6:]
 
-    c_lin_p_gain = 5.0
+    c_lin_p_gain = 20.0
     com_acc = c_lin_p_gain * (world_com_vel - qvel[0:3])
     
     c_ang_p_gain = 1.0
@@ -426,6 +428,7 @@ def step(model, data, act, ids, is_mjx = False, debug = False):
             "des_com_vel": world_com_vel,
             "des_angvel": des_angvel,
             "real_com_vel": data.qvel[0:3],
+            "real_angvel": data.qvel[3:6],
         }
         return debug_info
     else:

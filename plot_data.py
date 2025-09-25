@@ -22,6 +22,7 @@ def main():
     real_com_vel = load_matrix(os.path.join('data', 'real_com_vel.csv'))
     des_com_vel = load_matrix(os.path.join('data', 'des_com_vel.csv'))
     des_com_angvel = load_matrix(os.path.join('data', 'des_angvel.csv'))
+    real_angvel = load_matrix(os.path.join('data', 'real_angvel.csv'))
 
     range_lower = 100
     range_upper = 200
@@ -32,8 +33,8 @@ def main():
     lt_mag = np.linalg.norm(f[:, 3:6], axis=1)
     rf_mag = np.linalg.norm(f[:, 6:9], axis=1)
     rt_mag = np.linalg.norm(f[:, 9:12], axis=1)
-    plt.plot(lt_mag)
-    plt.plot(rt_mag)
+    #plt.plot(lt_mag)
+    #plt.plot(rt_mag)
 
     #des_com_vel_mag = np.linalg.norm(des_com_vel, axis=1)
     #plt.plot(des_com_vel_mag)
@@ -43,9 +44,11 @@ def main():
     #plt.plot(com_ref[range_lower:range_upper, 0], label='ref x')
     #plt.plot(com_ref[range_lower:range_upper, 1], label='ref y')
     #plt.plot(com_ref[range_lower:range_upper, 2], label='ref z')
-    #plt.plot(real_com_vel[range_lower:range_upper, 2], label='real z')
-    #plt.plot(des_com_vel[range_lower:range_upper, 2], label='des z')
-    #plt.plot(des_com_angvel[range_lower:range_upper, 2], label='des yaw')
+    plt.plot(real_com_vel[range_lower:range_upper, 0], label='real z')
+    plt.plot(des_com_vel[range_lower:range_upper, 0], label='des z')
+    #plt.plot(des_com_angvel[range_lower:range_upper, 0], label='des yaw')
+    #plt.plot(real_angvel[range_lower:range_upper, 0], label='real yaw')
+    plt.legend()
     plt.show()
 
 if __name__ == '__main__':
