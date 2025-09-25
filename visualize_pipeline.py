@@ -46,16 +46,20 @@ from models.booster_t1_pgnd.booster_ids import ids
 import numpy as np
 array_dict = {}
 
-def debug_eefpbc(state, act, i):
+def debug_eefpbc(state, prev_info, act, i):
     logits = maqp.ctrl2logits(act, ids)
     debug_dict = jit_maqp_step(state, act)
     for key in debug_dict:
         if key not in array_dict:
             array_dict[key] = np.zeros([1000] + list(debug_dict[key].shape))
         array_dict[key][i, :] = np.array(debug_dict[key])
-    print("logits qp_weight:", logits["qc_weight"])
 
-dir = "training/test_maqp_5"
+    current_u = debug_dict["u"]
+    prev_u = prev_info["last_u_act"]
+    print("u_change:", jnp.sum(jnp.square(current_u - prev_u)))
+    #print("logits qp_weight:", logits["qc_weight"])
+
+dir = "training/test_maqp_6"
 
 model_path = dir + "/walk_policy"
 saved_params = model.load_params(model_path)
@@ -76,7 +80,7 @@ ctrl_list = []
 obs_list = []
 nn_p_list = []
 states = []
-
+prev_info = state.info
 for c in range(1000):
     act_rng, rng = jax.random.split(rng)
     obs_list += [state.obs]
@@ -87,8 +91,9 @@ for c in range(1000):
     state = jit_step(state, ctrl)
     pipeline_state = state.data
     #print(state.data.contact)
-    print(state.info["last_contact"])
-    debug_eefpbc(state.data, ctrl, c)
+    #print(state.info["last_contact"])
+    debug_eefpbc(state.data, prev_info, ctrl, c)
+    prev_info = state.info
     #print(ids["col"])
     #print(state.data.sensordata)
     #debug_eefpbc(ctrl)
