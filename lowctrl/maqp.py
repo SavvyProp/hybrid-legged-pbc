@@ -127,7 +127,7 @@ def maqp(m, h, w, a_stc,
     s = nn.sigmoid(w)
     
     # q_ddot_com, q_ddot_uc, F
-    weights = jnp.array([10000.0, 1000.0, 1.0, 100.0, 0.1, 0.01])
+    weights = jnp.array([10000.0, 1000.0, 1.0, 10.0, 0.1, 0.01])
     mat_height = 6 + 6 + ids["ctrl_num"] + 6 * ids["eef_num"]
     uc_size = ids["ctrl_num"] + 6
     F_size = ids["eef_num"] * 6
@@ -457,8 +457,8 @@ def default_act(ids):
     des_com_angvel = jnp.zeros([3])
     #w = jnp.ones([ids["eef_num"]]) * 4.0
     w = jnp.array([10., 10., -5., -5.])
-    qc_weight = jnp.ones([ids["ctrl_num"]]) * -4
-    qc_weight = qc_weight.at[0:11].set(4.0)
+    qc_weight = jnp.ones([ids["ctrl_num"]]) * -1
+    qc_weight = qc_weight.at[0:11].set(1.0)
     pd_weight = jnp.ones([ids["ctrl_num"]]) * 2.0
     act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w, qc_weight, pd_weight], axis = 0)
     return act
