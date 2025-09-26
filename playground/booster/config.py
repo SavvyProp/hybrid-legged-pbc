@@ -30,8 +30,8 @@ ppo_params = config_dict.create(
 
 
 ppo_params.network_factory = config_dict.create(
-        policy_hidden_layer_sizes=(512, 256, 256, 128),
-        value_hidden_layer_sizes=(512, 256, 256, 128),
+        policy_hidden_layer_sizes=(1024, 512, 512, 256, 256),
+        value_hidden_layer_sizes=(512, 512, 256, 256),
         policy_obs_key="state",
         value_obs_key="privileged_state",
         distribution_type = "normal",
