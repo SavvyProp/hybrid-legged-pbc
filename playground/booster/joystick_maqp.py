@@ -102,7 +102,7 @@ def default_config() -> config_dict.ConfigDict:
               feet_distance=-1.0,
               collision=-1.0,
               pbc_w=-1.0,
-              qp_weight= 0.00,#0.05,
+              qp_weight=0.05,
               select=0.25,
               maqp_cons=1.0,
               vel_def=0.25,
