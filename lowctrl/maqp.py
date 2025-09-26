@@ -328,8 +328,11 @@ def ctrl2logits(act, ids):
     qc_weight = act[ids["ctrl_num"] + ids["eef_num"] + 6 : ids["ctrl_num"] * 2 + ids["eef_num"] + 6]
     pd_weight = act[ids["ctrl_num"] * 2 + ids["eef_num"] + 6:
                     ids["ctrl_num"] * 3 + ids["eef_num"] + 6]
+    des_pos_pd = act[ids["ctrl_num"] * 3 + ids["eef_num"] + 6:
+                    ids["ctrl_num"] * 4 + ids["eef_num"] + 6]
     logits = {
         "des_pos": des_pos,
+        "des_pos_pd": des_pos_pd,
         "des_com_vel": des_com_vel,
         "des_com_angvel": des_com_angvel,
         "w": w,
@@ -342,6 +345,7 @@ def ctrl2components(act, ids):
     # des_pos, des_com_pos, w
     logits = ctrl2logits(act, ids)
     des_pos = ids["default_qpos"][7:] + jnp.tanh(logits["des_pos"]) * 1.0
+    des_pos_pd = ids["default_qpos"][7:] + jnp.tanh(logits["des_pos_pd"]) * 1.0
     #des_angvel = jnp.tanh(logits["des_com_angvel"]) * 1.0
     des_angvel = logits["des_com_angvel"] * 0.20
     des_angvel_mag = jnp.clip(jnp.linalg.norm(des_angvel), 0.0, 3.0)
@@ -355,6 +359,7 @@ def ctrl2components(act, ids):
     pd_weight = nn.sigmoid(logits["pd_weight"])
     outputs = {
         "des_pos": des_pos,
+        "des_pos_pd": des_pos_pd,
         "des_com_vel": des_com_vel,
         "des_com_angvel": des_angvel,
         "w": w,
@@ -386,6 +391,7 @@ def highlvlPD(data, des_pos, des_com_vel, des_angvel, ids):
 
 def step(model, data, act, ids, is_mjx = False, debug = False):
     output = ctrl2components(act, ids)
+    des_pos_pd = output["des_pos_pd"]
     des_pos = output["des_pos"]
     des_com_vel = output["des_com_vel"]
     des_angvel = output["des_com_angvel"]
@@ -412,7 +418,7 @@ def step(model, data, act, ids, is_mjx = False, debug = False):
     qpos = data.qpos[ids["joint_pos_ids"]][7:]
     qvel = data.qvel[ids["joint_vel_ids"]][6:]
 
-    pd_tau = p_weight * (des_pos - qpos) + d_weight * (0.0 - qvel)
+    pd_tau = p_weight * (des_pos_pd - qpos) + d_weight * (0.0 - qvel)
 
     u_final = u * (pd_weight) + pd_tau * (1.0 - pd_weight)
 
@@ -464,7 +470,8 @@ def default_act(ids):
     qc_weight = jnp.ones([ids["ctrl_num"]]) * -1
     qc_weight = qc_weight.at[0:11].set(1.0)
     pd_weight = jnp.ones([ids["ctrl_num"]]) * 2.0
-    act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w, qc_weight, pd_weight], axis = 0)
+    des_pos_pd = jnp.zeros([ids["ctrl_num"]])
+    act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w, qc_weight, pd_weight, des_pos_pd], axis = 0)
     return act
 
 def default_act_lock_com(com_pos, data, ids):
