@@ -262,7 +262,7 @@ def maqp(m, h, w, a_stc,
 
         print("cons_mul: ", cons_lhs @ sol - cons_rhs)
 
-    return ub, f, q_ddot_com
+    return ub, f, q_ddot_com, q_ddot_uc
 
 
 def centroidal_qp(m, w,
@@ -367,14 +367,14 @@ def highlvlPD(data, des_pos, des_com_vel, des_angvel, ids):
     qpos = data.qpos[ids["joint_pos_ids"]]
     qvel = data.qvel[ids["joint_vel_ids"]]
 
-    jp_gain = 400.0
-    jd_gain = 20.0
+    jp_gain = 200.0
+    jd_gain = 10.0
 
     world_com_vel = lmath.rotate_des_com_vel(des_com_vel, data)
 
     qacc = jp_gain * (des_pos - qpos[7:]) - jd_gain * qvel[6:]
 
-    c_lin_p_gain = 20.0
+    c_lin_p_gain = 5.0
     com_acc = c_lin_p_gain * (world_com_vel - qvel[0:3])
     
     c_ang_p_gain = 4.0
@@ -398,7 +398,7 @@ def step(model, data, act, ids, is_mjx = False, debug = False):
         model, data, ids, is_mjx = is_mjx)
     a_stc = jnp.zeros(6 * ids["eef_num"])
     #s = jnp.where(nn.sigmoid(w) > 0.5, 1.0, 0.0)
-    u, f, q_ddot_com = maqp(m, h, w, a_stc,
+    u, f, q_ddot_com, q_ddot_uc = maqp(m, h, w, a_stc,
                 eefpos, com_pos,
                 jacs, jvp,
                 jac_com, com_jvp,
@@ -429,6 +429,10 @@ def step(model, data, act, ids, is_mjx = False, debug = False):
             "des_angvel": des_angvel,
             "real_com_vel": data.qvel[0:3],
             "real_angvel": data.qvel[3:6],
+            "q_ddot_uc": q_ddot_uc,
+            "qacc_c": qacc_c,
+            "des_pos": des_pos,
+            "real_pos": qpos
         }
         return debug_info
     else:
