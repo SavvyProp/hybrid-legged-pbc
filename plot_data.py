@@ -13,13 +13,14 @@ def load_matrix(path: str) -> np.ndarray:
 def plot_cols_11_16_overlaid(pd_tau: np.ndarray, u: np.ndarray, *, 
                              legend,
                              ylabel: str = "torque",
+                             idxs: np.ndarray = np.arange(11,17),
                              suptitle: str = "u & pd_tau cols 11–16", save_path: str | None = None):
     """Plot 6 subplots (columns 11..16, 1-based) overlaying pd_tau and u.
     pd_tau, u: (n, 23) arrays. Returns (fig, axes).
     """
     assert pd_tau.shape[1] >= 16 and u.shape[1] >= 16, "Expect (n,23) inputs"
     #idxs = np.arange(10, 16)  # 0-based indices for columns 11..16
-    idxs = np.arange(11, 17)
+    #idxs = np.arange(11, 17)
     n = pd_tau.shape[0]
     t = np.arange(n)
 
@@ -207,6 +208,14 @@ def main():
                              ylabel='position (rad)',
                              suptitle='des_pos & real_pos cols 11–16',
                              save_path=os.path.join('data', 'des_pos_vs_real_pos.png'))
+
+    plot_cols_11_16_overlaid(q_ddot_uc[range_lower:range_upper, :], 
+                             qacc_c[range_lower:range_upper, :], 
+                             legend=['q_ddot_uc', 'qacc_c'],
+                             ylabel='joint acceleration (rad/s^2)',
+                             suptitle='q_ddot_uc & qacc_c cols 11–16',
+                             idxs=np.arange(11 + 6, 17 + 6),
+                             save_path=os.path.join('data', 'q_ddot_uc_vs_qacc_c.png'))
 
     # New: plot for f[:, 0:12]
     plot_f_first12(f[range_lower:range_upper, :], save_path=os.path.join('data', 'f_first12.png'))
