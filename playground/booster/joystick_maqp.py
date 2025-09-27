@@ -93,7 +93,7 @@ def default_config() -> config_dict.ConfigDict:
               # Other rewards.
               stand_still=0.0,
               alive=0.25,
-              termination=0.0,
+              termination=-100.0,
               # Pose related rewards.
               joint_deviation_knee=-0.1,
               joint_deviation_hip=-0.1,
