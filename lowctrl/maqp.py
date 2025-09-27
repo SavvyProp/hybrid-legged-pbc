@@ -127,7 +127,7 @@ def maqp(m, h, w, a_stc,
     s = nn.sigmoid(w)
     
     # q_ddot_com, q_ddot_uc, F
-    weights = jnp.array([10000.0, 1000.0, 1.0, 10.0, 0.1, 0.01])
+    weights = jnp.array([1e4, 1e5, 1e1, 1e3, 1e1, 1e1])
     mat_height = 6 + 6 + ids["ctrl_num"] + 6 * ids["eef_num"]
     uc_size = ids["ctrl_num"] + 6
     F_size = ids["eef_num"] * 6
@@ -420,6 +420,8 @@ def step(model, data, act, ids, is_mjx = False, debug = False):
     u_final = jnp.clip(u_final, -tau_limits, tau_limits)
     if debug:
         debug_info = {
+            "ctrl": u_final,
+            "pd_weight": pd_weight,
             "pd_tau": pd_tau,
             "u": u,
             "f": f,
@@ -519,7 +521,7 @@ def test_act_move_com(com_pos, data, t, ids):
 
     point_vec = com_pos - current_com
 
-    vel_ = point_vec * 50.0
+    vel_ = point_vec * 200.0
     vel_mag_norm = jnp.clip(jnp.linalg.norm(vel_), min = 0.0, max = 3.0)
     vel_ = vel_ * vel_mag_norm / (jnp.linalg.norm(vel_) + 1e-6)
 
@@ -534,7 +536,7 @@ def test_act_move_com(com_pos, data, t, ids):
 
     ang_disp = lmath.angular_displacement_from_A_to_B(A, B)
 
-    ang_vel = ang_disp * 3.0
+    ang_vel = ang_disp * 9.0
 
     ang_vel_norm = jnp.clip(jnp.linalg.norm(ang_vel), min = 0.0, max = 3.0)
 

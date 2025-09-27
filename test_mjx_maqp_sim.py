@@ -27,17 +27,18 @@ t = 0
 def step_fn(mjx_model, mjx_state, init_com, t):
     #act = default_act(bids.ids)
     act = maqp.test_act_move_com(init_com, mjx_state, t, bids.ids)
-    ctrl = maqp.step(mjx_model, mjx_state, act, bids.ids, is_mjx = True)
+    output_dict = maqp.step(mjx_model, mjx_state, act, bids.ids, is_mjx = True, debug=True)
+    ctrl = output_dict["ctrl"]
     data = mjx_state.replace(ctrl=ctrl)
     data = mjx.step(mjx_model, data)
-    return data
-
+    return data, output_dict
 
 viewer = mujoco.viewer.launch_passive(model, data)
 for c in range(5000):
     print("step {}".format(c))
     #mujoco.mj_step(model, data)
-    state = step_fn(mjx_model, state, init_com, t)
+    state, output_dict = step_fn(mjx_model, state, init_com, t)
+    print(output_dict["com_ref"])
     #m_uc, h_uc = eefpbc.get_mh(mjx_model, state, bids.ids)
     #print(m_uc)
     #if (c % 100) == 0:

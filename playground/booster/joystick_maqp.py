@@ -80,7 +80,7 @@ def default_config() -> config_dict.ConfigDict:
               base_height=0.0,
               # Energy related rewards.
               torques=0.0,
-              action_rate=-0.000,
+              action_rate=-0.0001,
               energy=0.0,
               dof_acc=0.0,
               dof_vel=0.0,
@@ -102,11 +102,11 @@ def default_config() -> config_dict.ConfigDict:
               feet_distance=-1.0,
               collision=-1.0,
               pbc_w=-1.0,
-              qp_weight=0.00,
+              qp_weight=0.05,
               select=0.0,
-              maqp_cons=0.0,
-              vel_def=0.0,
-              vel_action_rate = 0.0
+              maqp_cons=1.0,
+              vel_def=0.25,
+              vel_action_rate = -0.005
           ),
           tracking_sigma=0.25,
           max_foot_height=0.12,
@@ -604,7 +604,9 @@ class Joystick(t1_base.T1Env):
                           vel_last_act))
     c2 = jp.sum(jp.square(angvel_act - 
                           angvel_last_act))
-    return c1 + c2
+    rew = c1 + c2
+    rew = jp.clip(rew, 50.0, -50.0)
+    return rew
 
   def _reward_select(self, action):
     logits = ctrl2logits(action, bids.ids)
@@ -665,9 +667,9 @@ class Joystick(t1_base.T1Env):
     u_action_rate = jp.clip(u_action_rate, -0.50, 0.0)
     info["last_u_act"] = u
 
-    total_rew = (torque_lim_rew * 0.50 + 
+    total_rew = (torque_lim_rew * 0.40 + 
                  frc_rew * 0.10 + 
-                 foot_torque_rew * 0.70 +
+                 foot_torque_rew * 0.20 +
                  u_action_rate * 1.0)
 
     rew = jp.nan_to_num(total_rew, nan=-1.0, posinf=-1.0, neginf=-1.0)
@@ -740,6 +742,7 @@ class Joystick(t1_base.T1Env):
     del last_last_act  # Unused.
     c1 = jp.sum(jp.square(act - 
                           last_act))
+    c1 = jp.clip(c1, 500.0, -500.0)
     return c1
 
   def _cost_dof_acc(self, qacc: jax.Array) -> jax.Array:
