@@ -127,7 +127,7 @@ def maqp(m, h, w, a_stc,
     s = nn.sigmoid(w)
     
     # q_ddot_com, q_ddot_uc, F
-    weights = jnp.array([10000.0, 1000.0, 1.0, 10.0, 0.1, 0.01])
+    weights = jnp.array([1e4, 1e5, 1e1, 1e1, 1e1, 1e1])
     mat_height = 6 + 6 + ids["ctrl_num"] + 6 * ids["eef_num"]
     uc_size = ids["ctrl_num"] + 6
     F_size = ids["eef_num"] * 6
@@ -374,7 +374,7 @@ def highlvlPD(data, des_pos, des_com_vel, des_angvel, ids):
 
     qacc = jp_gain * (des_pos - qpos[7:]) - jd_gain * qvel[6:]
 
-    c_lin_p_gain = 20.0
+    c_lin_p_gain = 5.0
     com_acc = c_lin_p_gain * (world_com_vel - qvel[0:3])
     
     c_ang_p_gain = 4.0
