@@ -414,7 +414,8 @@ def step(model, data, act, ids, is_mjx = False, debug = False):
 
     pd_tau = p_weight * (des_pos - qpos) + d_weight * (0.0 - qvel)
 
-    u_final = u * (pd_weight) + pd_tau * (1.0 - pd_weight)
+    #u_final = u * (pd_weight) + pd_tau * (1.0 - pd_weight)
+    u_final = pd_tau
 
     tau_limits = ids["tau_limits"]
     u_final = jnp.clip(u_final, -tau_limits, tau_limits)
