@@ -56,10 +56,10 @@ def debug_eefpbc(state, prev_info, act, i):
 
     current_u = debug_dict["u"]
     prev_u = prev_info["last_u_act"]
-    print("u_change:", jnp.sum(jnp.square(current_u - prev_u)))
+    #print("u_change:", jnp.sum(jnp.square(current_u - prev_u)))
     #print("logits qp_weight:", logits["qc_weight"])
 
-dir = "training/test_maqp_8"
+dir = "training/test_maqp_11"
 
 model_path = dir + "/walk_policy"
 saved_params = model.load_params(model_path)
@@ -90,6 +90,8 @@ for c in range(1000):
     #nn_p, nn_d = raw_pd(raw_action)
     state = jit_step(state, ctrl)
     pipeline_state = state.data
+    print(state.metrics)
+    print(state.done)
     #print(state.data.contact)
     #print(state.info["last_contact"])
     debug_eefpbc(state.data, prev_info, ctrl, c)
@@ -119,7 +121,7 @@ while True:
         pipeline_state = pipeline_state_list[c1]
         state = states[c1]
         #print(state.info["phase"])
-        #print(state.metrics)
+        print(state.metrics)
         time.sleep(0.02)
         mjx.get_data_into(data, mj_model, pipeline_state)
         viewer.sync()

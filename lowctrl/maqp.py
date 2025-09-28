@@ -127,7 +127,7 @@ def maqp(m, h, w, a_stc,
     s = nn.sigmoid(w)
     
     # q_ddot_com, q_ddot_uc, F
-    weights = jnp.array([1e4, 1e5, 1e1, 1e1, 1e1, 1e1])
+    weights = jnp.array([1e4, 1e5, 1e0, 1e3, 1e0, 1e0])
     mat_height = 6 + 6 + ids["ctrl_num"] + 6 * ids["eef_num"]
     uc_size = ids["ctrl_num"] + 6
     F_size = ids["eef_num"] * 6
@@ -457,11 +457,41 @@ def default_act(ids):
     des_com_angvel = jnp.zeros([3])
     #w = jnp.ones([ids["eef_num"]]) * 4.0
     w = jnp.array([10., 10., -5., -5.])
-    qc_weight = jnp.ones([ids["ctrl_num"]]) * -1
+    qc_weight = jnp.ones([ids["ctrl_num"]]) * -3
     qc_weight = qc_weight.at[0:11].set(1.0)
     pd_weight = jnp.ones([ids["ctrl_num"]]) * 2.0
     act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w, qc_weight, pd_weight], axis = 0)
     return act
+
+def default_act_lock_com(com_pos, data, ids):
+    act = default_act(ids)
+    # Set controller to lock com position
+    current_com = data.subtree_com[0]
+    vel_mag = 0.5
+    point_vec = com_pos - current_com
+    point_vec = vel_mag * point_vec / jnp.linalg.norm(point_vec + 1e-6)
+    des_com_vel = point_vec
+    act = act.at[ids["ctrl_num"]:ids["ctrl_num"] + 3].set(des_com_vel)
+
+    # Set controller to lock base orientation
+
+    A = data.qpos[3:7]
+
+    B = ids["default_qpos"][3:7]
+
+    ang_disp = lmath.angular_displacement_from_A_to_B(A, B)
+
+    ang_vel = ang_disp * 1.0
+
+    ang_vel_norm = jnp.clip(jnp.linalg.norm(ang_vel), min = 0.0, max = 3.0)
+
+    ang_vel = ang_vel * ang_vel_norm / (jnp.linalg.norm(ang_vel)  + 1e-6)
+
+
+    act = act.at[ids["ctrl_num"] + 3: ids["ctrl_num"] + 6].set(ang_vel)
+
+    return act
+
 
 def default_act_lock_com(com_pos, data, ids):
     act = default_act(ids)
@@ -515,7 +545,7 @@ def test_act_move_com(com_pos, data, t, ids):
 
     point_vec = com_pos - current_com
 
-    vel_ = point_vec * 50.0
+    vel_ = point_vec * 200.0
     vel_mag_norm = jnp.clip(jnp.linalg.norm(vel_), min = 0.0, max = 3.0)
     vel_ = vel_ * vel_mag_norm / (jnp.linalg.norm(vel_) + 1e-6)
 
@@ -530,7 +560,7 @@ def test_act_move_com(com_pos, data, t, ids):
 
     ang_disp = lmath.angular_displacement_from_A_to_B(A, B)
 
-    ang_vel = ang_disp * 3.0
+    ang_vel = ang_disp * 9.0
 
     ang_vel_norm = jnp.clip(jnp.linalg.norm(ang_vel), min = 0.0, max = 3.0)
 
@@ -539,4 +569,96 @@ def test_act_move_com(com_pos, data, t, ids):
 
     act = act.at[ids["ctrl_num"] + 3: ids["ctrl_num"] + 6].set(ang_vel)
 
+    return act
+
+
+def shift_com_pos(com_pos, data, t, tmax, ids, delta = jnp.array([0.0, 0.04, 0.0])):
+    act = default_act(ids)
+    current_com = data.subtree_com[0]
+
+    
+    com_pos += delta * jnp.clip(t / tmax, 0.0, 1.0)
+
+    point_vec = com_pos - current_com
+
+    vel_ = point_vec * 200.0
+    vel_mag_norm = jnp.clip(jnp.linalg.norm(vel_), min = 0.0, max = 3.0)
+    vel_ = vel_ * vel_mag_norm / (jnp.linalg.norm(vel_) + 1e-6)
+
+    des_com_vel = vel_
+    act = act.at[ids["ctrl_num"]:ids["ctrl_num"] + 3].set(des_com_vel)
+
+    # Set controller to lock base orientation
+
+    A = data.qpos[3:7]
+
+    B = ids["default_qpos"][3:7]
+
+    ang_disp = lmath.angular_displacement_from_A_to_B(A, B)
+
+    ang_vel = ang_disp * 9.0
+
+    ang_vel_norm = jnp.clip(jnp.linalg.norm(ang_vel), min = 0.0, max = 3.0)
+
+    ang_vel = ang_vel * ang_vel_norm / (jnp.linalg.norm(ang_vel)  + 1e-6)
+
+
+    act = act.at[ids["ctrl_num"] + 3: ids["ctrl_num"] + 6].set(ang_vel)
+    return act
+
+def raise_right_leg(com_pos, data, t, tmax, ids):
+    target_pose = jnp.zeros([ids["ctrl_num"]])
+    target_pose = target_pose.at[17].set(-1.0)
+    target_pose = target_pose.at[20].set(2.0)
+    
+    des_pos = jnp.zeros([ids["ctrl_num"]])
+    # -0.7 on right hip, +1 on right knee
+    fac = jnp.clip(t / tmax, 0.0, 1.0)
+    des_pos = des_pos * (1.0 - fac) + target_pose * fac
+    
+    des_com_vel = jnp.zeros([3])
+    des_com_angvel = jnp.zeros([3])
+    #w = jnp.ones([ids["eef_num"]]) * 4.0
+    w = jnp.array([10., -5., -5., -5.])
+    qc_weight = jnp.ones([ids["ctrl_num"]]) * -3
+    qc_weight = qc_weight.at[0:11].set(3.0)
+    qc_weight = qc_weight.at[17:].set(3.0)
+    pd_weight = jnp.ones([ids["ctrl_num"]]) * 2.0
+    act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w, qc_weight, pd_weight], axis = 0)
+    
+    com_pos = com_pos + jnp.array([0.0, 0.05, 0.0])
+    current_com = data.subtree_com[0]
+
+    # Set qc weights to 1 for right leg joints
+    point_vec = com_pos - current_com
+
+    vel_ = point_vec * 200.0
+    vel_mag_norm = jnp.clip(jnp.linalg.norm(vel_), min = 0.0, max = 3.0)
+    vel_ = vel_ * vel_mag_norm / (jnp.linalg.norm(vel_) + 1e-6)
+
+    des_com_vel = vel_
+    act = act.at[ids["ctrl_num"]:ids["ctrl_num"] + 3].set(des_com_vel)
+
+    # Set controller to lock base orientation
+
+    A = data.qpos[3:7]
+
+    B = ids["default_qpos"][3:7]
+
+    ang_disp = lmath.angular_displacement_from_A_to_B(A, B)
+
+    ang_vel = ang_disp * 9.0
+
+    ang_vel_norm = jnp.clip(jnp.linalg.norm(ang_vel), min = 0.0, max = 3.0)
+
+    ang_vel = ang_vel * ang_vel_norm / (jnp.linalg.norm(ang_vel)  + 1e-6)
+
+
+    act = act.at[ids["ctrl_num"] + 3: ids["ctrl_num"] + 6].set(ang_vel)
+    return act
+
+def ds2ss(com_pos, data, t, ids):
+    act1 = shift_com_pos(com_pos, data, t, 2, ids)
+    act2 = raise_right_leg(com_pos, data, t - 2, 0.5, ids)
+    act = jnp.where(t < 2.0, act1, act2)
     return act

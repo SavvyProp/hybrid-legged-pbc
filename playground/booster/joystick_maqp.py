@@ -102,10 +102,10 @@ def default_config() -> config_dict.ConfigDict:
               feet_distance=-1.0,
               collision=-1.0,
               pbc_w=-1.0,
-              qp_weight=0.05,
+              qc_weight=0.05,
               select=0.25,
               maqp_cons=1.0,
-              vel_def=0.25,
+              vel_def=0.20,
               vel_action_rate = -0.005
           ),
           tracking_sigma=0.25,
@@ -586,7 +586,7 @@ class Joystick(t1_base.T1Env):
         "pose": self._cost_pose(data.qpos[7:]),
         "feet_distance": self._cost_feet_distance(data, info),
         "pbc_w": self._cost_pbc_w(action, contact),
-        "qp_weight": self._reward_weight_logit_weight(action),
+        "qc_weight": self._reward_weight_logit_weight(action, contact),
         "select": self._reward_select(action),
         "maqp_cons": self._reward_maqp_cons(data, info, action),
         "vel_def": self._reward_des_vel(action),
@@ -612,9 +612,9 @@ class Joystick(t1_base.T1Env):
     return mean_weight
   
   def _reward_des_vel(self, action):
-    logits = ctrl2logits(action, bids.ids)
-    des_vel_mag = jp.linalg.norm(logits["des_com_vel"] * 0.05)
-    des_angvel_mag = jp.linalg.norm(logits["des_com_angvel"] * 0.20)
+    components = maqp.ctrl2components(action, self.ids)
+    des_vel_mag = jp.linalg.norm(components["des_com_vel"])
+    des_angvel_mag = jp.linalg.norm(components["des_com_angvel"])
     des_vel_cap = 0.7
     des_angvel_cap = 3.0
     des_vel_rew = jp.clip(des_vel_mag - des_vel_cap,
@@ -662,12 +662,12 @@ class Joystick(t1_base.T1Env):
 
     u_action_rate = jp.sum(jp.square(u - info["last_u_act"]))
     u_action_rate *= -0.000005
-    u_action_rate = jp.clip(u_action_rate, -0.50, 0.0)
+    u_action_rate = jp.clip(u_action_rate, -0.30, 0.0)
     info["last_u_act"] = u
 
-    total_rew = (torque_lim_rew * 0.50 + 
+    total_rew = (torque_lim_rew * 0.30 + 
                  frc_rew * 0.10 + 
-                 foot_torque_rew * 0.70 +
+                 foot_torque_rew * 0.30 +
                  u_action_rate * 1.0)
 
     rew = jp.nan_to_num(total_rew, nan=-1.0, posinf=-1.0, neginf=-1.0)
@@ -675,10 +675,19 @@ class Joystick(t1_base.T1Env):
     return rew
   
   # Tracking rewards.
-  def _reward_weight_logit_weight(self, action):
-    logits = ctrl2logits(action, bids.ids)
+  def _reward_weight_logit_weight(self, action, contact):
+    logits = ctrl2logits(action, self.ids)
 
-    rew = jp.sum(jp.square(logits["qc_weight"]))
+    ref = jp.ones(self.ids["ctrl_num"])
+    left_contact_mask = jp.zeros(self.ids["ctrl_num"])
+    left_contact_mask = left_contact_mask.at[11:17].set(1.0)
+    right_contact_mask = jp.zeros(self.ids["ctrl_num"])
+    right_contact_mask = right_contact_mask.at[17:23].set(1.0)
+    mask = contact[0] * left_contact_mask + contact[1] * right_contact_mask
+
+    ref = ref * (1.0 - mask)
+
+    rew = jp.sum(jp.square(logits["qc_weight"] - ref))
     rew = jp.exp(-rew / 2.0)
 
     return rew

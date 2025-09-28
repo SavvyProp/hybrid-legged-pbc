@@ -10,13 +10,17 @@ def load_matrix(path: str) -> np.ndarray:
     return np.loadtxt(path, delimiter=",")
 
 
-def plot_cols_11_16_overlaid(pd_tau: np.ndarray, u: np.ndarray, *, suptitle: str = "u & pd_tau cols 11–16", save_path: str | None = None):
+def plot_cols_11_16_overlaid(pd_tau: np.ndarray, u: np.ndarray, *, 
+                             legend,
+                             ylabel: str = "torque",
+                             idxs: np.ndarray = np.arange(11,17),
+                             suptitle: str = "u & pd_tau cols 11–16", save_path: str | None = None):
     """Plot 6 subplots (columns 11..16, 1-based) overlaying pd_tau and u.
     pd_tau, u: (n, 23) arrays. Returns (fig, axes).
     """
     assert pd_tau.shape[1] >= 16 and u.shape[1] >= 16, "Expect (n,23) inputs"
     #idxs = np.arange(10, 16)  # 0-based indices for columns 11..16
-    idxs = np.arange(11, 17)
+    #idxs = np.arange(11, 17)
     n = pd_tau.shape[0]
     t = np.arange(n)
 
@@ -24,13 +28,13 @@ def plot_cols_11_16_overlaid(pd_tau: np.ndarray, u: np.ndarray, *, suptitle: str
     axes = axes.ravel()
     for i, col in enumerate(idxs):
         ax = axes[i]
-        ax.plot(t, pd_tau[:, col], label='pd_tau', linewidth=1.2)
-        ax.plot(t, u[:, col], label='u', linewidth=1.0)
+        ax.plot(t, pd_tau[:, col], label=legend[0], linewidth=1.2)
+        ax.plot(t, u[:, col], label=legend[1], linewidth=1.0)
         #ax.set_title(f'col {col+1}')
-        ax.set_title(f"{bids.joint_names[col]} torque")
+        ax.set_title(f"{bids.joint_names[col]} {ylabel}")
         ax.grid(True, linestyle='--', alpha=0.3)
         if i % 3 == 0:
-            ax.set_ylabel('torque')
+            ax.set_ylabel(ylabel)
         if i // 3 == 1:
             ax.set_xlabel('timestep')
         if i == 0:
@@ -77,6 +81,52 @@ def plot_f_first12(f: np.ndarray, *, suptitle: str = "f[:, 0:12] over time", sav
     return fig, axes
 
 
+def plot_qddot_com_vs_ref(q_ddot_com: np.ndarray, com_ref: np.ndarray, *, suptitle: str = "q_ddot_com vs com_ref (xyz)", save_path: str | None = None, idx_range: tuple[int, int] | None = None):
+    """Plot 3 subplots overlaying xyz components of q_ddot_com and com_ref.
+    Accepts (n,6) or (n,3) arrays; only the first 3 components are plotted.
+    """
+    q = np.asarray(q_ddot_com)
+    r = np.asarray(com_ref)
+    if q.ndim != 2 or r.ndim != 2:
+        raise ValueError("q_ddot_com and com_ref must be 2D arrays")
+    if q.shape[1] >= 3:
+        q = q[:, :3]
+    else:
+        raise ValueError("q_ddot_com must have at least 3 columns")
+    if r.shape[1] >= 3:
+        r = r[:, :3]
+    else:
+        raise ValueError("com_ref must have at least 3 columns")
+
+    n = min(q.shape[0], r.shape[0])
+    lo, hi = (0, n) if idx_range is None else (max(0, int(idx_range[0])), min(n, int(idx_range[1])))
+    q = q[lo:hi]
+    r = r[lo:hi]
+    t = np.arange(lo, lo + q.shape[0])
+
+    labels = ["x", "y", "z"]
+    fig, axes = plt.subplots(1, 3, figsize=(14, 3.5), sharex=True)
+    if not isinstance(axes, np.ndarray):
+        axes = np.array([axes])
+    for i in range(3):
+        ax = axes[i]
+        ax.plot(t, q[:, i], label="q_ddot_com", linewidth=1.2)
+        ax.plot(t, r[:, i], label="com_ref", linewidth=1.0)
+        ax.set_title(labels[i])
+        ax.grid(True, linestyle='--', alpha=0.3)
+        if i == 0:
+            ax.set_ylabel("acc (m/s^2)")
+        ax.set_xlabel("timestep")
+        if i == 0:
+            ax.legend(loc='best')
+    fig.suptitle(suptitle)
+    fig.tight_layout(rect=(0, 0, 1, 0.95))
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        fig.savefig(save_path, dpi=150)
+    return fig, axes
+
+
 def main():
     pd_tau_path = os.path.join('data', 'pd_tau.csv')
     u_path = os.path.join('data', 'u.csv')
@@ -91,12 +141,16 @@ def main():
     des_com_angvel = load_matrix(os.path.join('data', 'des_angvel.csv'))
     real_angvel = load_matrix(os.path.join('data', 'real_angvel.csv'))
 
-    range_lower = 100
-    range_upper = 200
+    real_pos = load_matrix(os.path.join('data', 'real_pos.csv'))
+    des_pos = load_matrix(os.path.join('data', 'des_pos.csv'))
+
+    q_ddot_uc = load_matrix(os.path.join('data', 'q_ddot_uc.csv'))
+    qacc_c = load_matrix(os.path.join('data', 'qacc_c.csv'))
+
+    range_lower = 300
+    range_upper = 500
 
     # Select plotting range
-    range_lower = 100
-    range_upper = 200
     n = des_com_vel.shape[0]
     lo = int(np.clip(range_lower, 0, max(n - 1, 0)))
     hi = int(np.clip(range_upper, lo + 1, n))
@@ -143,10 +197,32 @@ def main():
 
     # New: focused plot for cols 11..16 (1-based)
     plot_cols_11_16_overlaid(pd_tau[range_lower:range_upper, :], 
-                             u[range_lower:range_upper, :], save_path=os.path.join('data', 'u_pd_tau_cols_11_16.png'))
+                             u[range_lower:range_upper, :], 
+                             legend=['pd_tau', 'u'],
+                             ylabel='torque (Nm)',
+                             save_path=os.path.join('data', 'u_pd_tau_cols_11_16.png'))
+    
+    plot_cols_11_16_overlaid(des_pos[range_lower:range_upper, :], 
+                             real_pos[range_lower:range_upper, :], 
+                             legend=['des_pos', 'real_pos'],
+                             ylabel='position (rad)',
+                             suptitle='des_pos & real_pos cols 11–16',
+                             save_path=os.path.join('data', 'des_pos_vs_real_pos.png'))
+
+    plot_cols_11_16_overlaid(q_ddot_uc[range_lower:range_upper, :], 
+                             qacc_c[range_lower:range_upper, :], 
+                             legend=['q_ddot_uc', 'qacc_c'],
+                             ylabel='joint acceleration (rad/s^2)',
+                             suptitle='q_ddot_uc & qacc_c cols 11–16',
+                             idxs=np.arange(11 + 6, 17 + 6),
+                             save_path=os.path.join('data', 'q_ddot_uc_vs_qacc_c.png'))
 
     # New: plot for f[:, 0:12]
     plot_f_first12(f[range_lower:range_upper, :], save_path=os.path.join('data', 'f_first12.png'))
+
+    # New: plot for q_ddot_com vs com_ref
+    plot_qddot_com_vs_ref(q_ddot_com[range_lower:range_upper, :], 
+                          com_ref[range_lower:range_upper, :], save_path=os.path.join('data', 'q_ddot_com_vs_com_ref.png'))
 
     plt.show()
 
