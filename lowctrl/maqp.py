@@ -127,7 +127,7 @@ def maqp(m, h, w, a_stc,
     s = nn.sigmoid(w)
     
     # q_ddot_com, q_ddot_uc, F
-    weights = jnp.array([1e4, 1e5, 1e0, 1e3, 1e0, 1e0])
+    weights = jnp.array([1e4, 1e4, 1e-1, 1e2, 1e-1, 1e-1])
     mat_height = 6 + 6 + ids["ctrl_num"] + 6 * ids["eef_num"]
     uc_size = ids["ctrl_num"] + 6
     F_size = ids["eef_num"] * 6
