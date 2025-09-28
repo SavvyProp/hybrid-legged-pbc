@@ -105,7 +105,7 @@ def default_config() -> config_dict.ConfigDict:
               qc_weight=0.05,
               select=0.25,
               maqp_cons=1.0,
-              vel_def=0.20,
+              vel_def=0.40,
               vel_action_rate = -0.005
           ),
           tracking_sigma=0.25,
@@ -589,7 +589,7 @@ class Joystick(t1_base.T1Env):
         "qc_weight": self._reward_weight_logit_weight(action, contact),
         "select": self._reward_select(action),
         "maqp_cons": self._reward_maqp_cons(data, info, action),
-        "vel_def": self._reward_des_vel(action),
+        "vel_def": self._reward_des_vel(action, info["command"]),
         "vel_action_rate": self._cost_vel_action_rate(action, info["last_act"]),
     }
   
@@ -611,7 +611,7 @@ class Joystick(t1_base.T1Env):
     mean_weight = jp.mean(nn.sigmoid(logits["pd_weight"]))
     return mean_weight
   
-  def _reward_des_vel(self, action):
+  def _reward_des_vel(self, action, lin_vel):
     components = maqp.ctrl2components(action, self.ids)
     des_vel_mag = jp.linalg.norm(components["des_com_vel"])
     des_angvel_mag = jp.linalg.norm(components["des_com_angvel"])
@@ -621,7 +621,14 @@ class Joystick(t1_base.T1Env):
                            min = 0.0, max = None)
     des_angvel_rew = jp.clip(des_angvel_mag - des_angvel_cap,
                            min = 0.0, max = None)
-    return jp.exp(-(des_vel_rew + des_angvel_rew * 0.50))
+    rew_vel_lim = jp.exp(-(des_vel_rew + des_angvel_rew * 0.50))
+
+    # vel tracking reward
+
+    lin_vel_error = jp.sum(jp.square(lin_vel[:2] - components["des_com_vel"][:2]))
+    linvel_rew = jp.exp(-lin_vel_error / self._config.reward_config.tracking_sigma)
+
+    return rew_vel_lim * 0.5 + linvel_rew
   
   def _reward_maqp_cons(self, data, info, action):
     debug_dict = maqp.step(self._mjx_model, 

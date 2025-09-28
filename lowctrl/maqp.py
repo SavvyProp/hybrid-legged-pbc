@@ -49,6 +49,7 @@ def f_mag_q(w, ids):
 
 def q_ddot_c_q(qc_weight, q_ddot_c_des, ids):
     big_c = jnp.eye(ids["ctrl_num"]) * qc_weight[:, None]
+    big_c = big_c + 1e-1 * jnp.eye(ids["ctrl_num"])
     big_q = big_c.T @ big_c
     small_q = big_c.T @ q_ddot_c_des
     return big_q, small_q
