@@ -47,11 +47,9 @@ def f_mag_q(w, ids):
     big_qp = tau_cost @ big_qp 
     return big_qp, jnp.zeros(6 * ids["eef_num"])
 
-def q_ddot_c_q(qc_weight, q_ddot_c_des, ids):
-    big_c = jnp.eye(ids["ctrl_num"]) * qc_weight[:, None]
-    big_c = big_c + 1e-1 * jnp.eye(ids["ctrl_num"])
-    big_q = big_c.T @ big_c
-    small_q = big_c.T @ q_ddot_c_des
+def q_ddot_c_q(ids):
+    big_q = jnp.eye(ids["ctrl_num"])
+    small_q = jnp.zeros(ids["ctrl_num"])
     return big_q, small_q
 
 def qu_mag_q():
@@ -74,6 +72,13 @@ def eefs_acc_q(s, jacs, jvp, a_stc, ids):
         small_q_i *= s[c]
         big_q = big_q + big_q_i
         small_q = small_q + small_q_i
+    return big_q, small_q
+
+def u_pd_q(qc_weight, u_ref, ids):
+    big_c = jnp.eye(ids["ctrl_num"]) * qc_weight[:, None]
+    big_c = big_c + jnp.eye(ids["ctrl_num"]) * 1e-1
+    big_q = big_c.T @ big_c
+    small_q = big_c.T @ u_ref
     return big_q, small_q
 
 # Functions to build the constraint matrices
@@ -106,6 +111,17 @@ def fullbody_u_cons(select, m, h, jacs):
     rhs = h_u
     return lhs, rhs
 
+def torque_cons(select, m, h, jacs):
+    # torque = -jc.T @ F + m_c_uc @ q_ddot_uc + h_c
+    # jc.T + torque - m_c_uc @ q_ddot_uc = h_c
+    h_c = h[6:]
+    m_c_uc = m[6:, :]
+    jc = jacs[:, 6:]
+
+    lhs = jc.T @ select["F"] + select["u_b"] - m_c_uc @ select["q_ddot_uc"]
+    rhs = h_c
+    return lhs, rhs
+
 def schur_solve(qp_q, qp_c, cons_lhs, cons_rhs):
     Q = 0.5 * (qp_q + qp_q.T)
     A = cons_lhs
@@ -123,19 +139,23 @@ def maqp(m, h, w, a_stc,
          eefpos, com_pos, 
          jacs, jvp, 
          com_jac, com_jvp, 
-         com_ref, qc_ref, qc_weight, ids, is_mjx = True, debug = False):
+         com_ref, qc_weight, u_ref, ids, is_mjx = True, debug = False):
     
     s = nn.sigmoid(w)
     
-    # q_ddot_com, q_ddot_uc, F
-    weights = jnp.array([1e4, 1e4, 1e-1, 1e2, 1e-1, 1e-1])
-    mat_height = 6 + 6 + ids["ctrl_num"] + 6 * ids["eef_num"]
+    # q_ddot_com, F, q_ddot_uc, u_b
+    weights = jnp.array([1e4, 1e4, 1e-1, 1e0, 1e-1, 1e-1, 1e2])
+    mat_height = 6 + 6 + ids["ctrl_num"] * 2 + 6 * ids["eef_num"]
     uc_size = ids["ctrl_num"] + 6
     F_size = ids["eef_num"] * 6
+    u_size = ids["ctrl_num"]
     select = {
         "q_ddot_com": jnp.block([jnp.eye(6), jnp.zeros((6, mat_height - 6))]),
         "F": jnp.block([jnp.zeros([F_size, 6]), jnp.eye(F_size), jnp.zeros((F_size, mat_height - 6 - F_size))]),
-        "q_ddot_uc": jnp.block([jnp.zeros([uc_size, mat_height - uc_size]), jnp.eye(uc_size)])
+        "q_ddot_uc": jnp.block([jnp.zeros([uc_size, mat_height - u_size  - uc_size]), 
+                                jnp.eye(uc_size), 
+                                jnp.zeros([uc_size, u_size])]),
+        "u_b": jnp.block([jnp.zeros([u_size, mat_height - u_size]), jnp.eye(u_size)])
     }
 
     # Prebuild 0
@@ -174,7 +194,7 @@ def maqp(m, h, w, a_stc,
     qp_q = qp_q.at[6: 6 + F_size, 6: 6 + F_size].add(big_q_f)
     qp_c = qp_c.at[6: 6 + F_size].add(small_q_f)
 
-    big_q_qc, small_q_qc = q_ddot_c_q(qc_weight, qc_ref, ids)
+    big_q_qc, small_q_qc = q_ddot_c_q(ids)
     big_q_qc *= weights[3]
     small_q_qc *= weights[3]
 
@@ -193,8 +213,15 @@ def maqp(m, h, w, a_stc,
     big_q_acc *= weights[5]
     small_q_acc *= weights[5]
     
-    qp_q = qp_q.at[6 + F_size:, 6 + F_size:].add(big_q_acc)
-    qp_c = qp_c.at[6 + F_size:].add(small_q_acc)
+    qp_q = qp_q.at[6 + F_size:mat_height - u_size, 
+                   6 + F_size:mat_height - u_size].add(big_q_acc)
+    qp_c = qp_c.at[6 + F_size:mat_height - u_size].add(small_q_acc)
+
+    big_q_u, small_q_u = u_pd_q(qc_weight, u_ref, ids)
+    big_q_u *= weights[6]
+    small_q_u *= weights[6]
+    qp_q = qp_q.at[mat_height - u_size:, mat_height - u_size:].add(big_q_u)
+    qp_c = qp_c.at[mat_height - u_size:].add(small_q_u)
 
     # Make qp constraints 
 
@@ -216,6 +243,10 @@ def maqp(m, h, w, a_stc,
     cons_lhs_list.append(fullbody_lhs)
     cons_rhs_list.append(fullbody_rhs)
 
+    torque_lhs, torque_rhs = torque_cons(select, m, h, jacs)
+    cons_lhs_list.append(torque_lhs)
+    cons_rhs_list.append(torque_rhs)
+
     cons_lhs = jnp.vstack(cons_lhs_list)
     cons_rhs = jnp.concatenate(cons_rhs_list, axis = 0)
 
@@ -233,11 +264,7 @@ def maqp(m, h, w, a_stc,
     f = sol[6:6 + ids["eef_num"] * 6]
     q_ddot_uc = sol[6 + ids["eef_num"] * 6:]
 
-    # add terms to solve for u_b
-    m_c_uc = m[6:, :]
-    hc = h[6:]
-
-    ub = m_c_uc @ q_ddot_uc + hc - jacs[:, 6:].T @ f
+    ub = sol[mat_height - u_size:]
 
     if (not is_mjx) and debug:
         
@@ -368,8 +395,8 @@ def highlvlPD(data, des_pos, des_com_vel, des_angvel, ids):
     qpos = data.qpos[ids["joint_pos_ids"]]
     qvel = data.qvel[ids["joint_vel_ids"]]
 
-    jp_gain = 200.0
-    jd_gain = 10.0
+    jp_gain = 400.0
+    jd_gain = 20.0
 
     world_com_vel = lmath.rotate_des_com_vel(des_com_vel, data)
 
@@ -393,6 +420,14 @@ def step(model, data, act, ids, is_mjx = False, debug = False):
     w = output["w"]
     qc_weight = output["qc_weight"]
     pd_weight = output["pd_weight"]
+
+    p_weight = ids["p_gains"]
+    d_weight = ids["d_gains"]
+
+    qpos = data.qpos[ids["joint_pos_ids"]][7:]
+    qvel = data.qvel[ids["joint_vel_ids"]][6:]
+
+    pd_tau = p_weight * (des_pos - qpos) + d_weight * (0.0 - qvel)
     
     qacc_c, com_accs, world_com_vel = highlvlPD(data, des_pos, des_com_vel, des_angvel, ids)
     m, h, jacs, jvp, jac_com, com_jvp, eefpos, com_pos = lmodel.get_kin_values(
@@ -403,17 +438,9 @@ def step(model, data, act, ids, is_mjx = False, debug = False):
                 eefpos, com_pos,
                 jacs, jvp,
                 jac_com, com_jvp,
-                com_accs, qacc_c,
-                qc_weight, ids, is_mjx = is_mjx)
+                com_accs,
+                qc_weight, pd_tau, ids, is_mjx = is_mjx)
     u = jnp.nan_to_num(u, posinf = 0.0, neginf = 0.0, nan = 0.0)
-
-    p_weight = ids["p_gains"]
-    d_weight = ids["d_gains"]
-
-    qpos = data.qpos[ids["joint_pos_ids"]][7:]
-    qvel = data.qvel[ids["joint_vel_ids"]][6:]
-
-    pd_tau = p_weight * (des_pos - qpos) + d_weight * (0.0 - qvel)
 
     u_final = u * (pd_weight) + pd_tau * (1.0 - pd_weight)
 
