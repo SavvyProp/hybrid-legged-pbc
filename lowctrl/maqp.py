@@ -43,7 +43,7 @@ def f_mag_q(w, ids):
     logits = -jnp.clip(w, -6.0, 6.0)
     big_qp = lmath.vec2diags(jnp.exp(logits), ids)
     big_qp += jnp.eye(6 * ids["eef_num"]) * 1
-    tau_cost = lmath.torqueCost(10.0, ids)
+    tau_cost = lmath.torqueCost(20.0, ids)
     big_qp = tau_cost @ big_qp 
     return big_qp, jnp.zeros(6 * ids["eef_num"])
 
@@ -144,7 +144,8 @@ def maqp(m, h, w, a_stc,
     s = nn.sigmoid(w)
     
     # q_ddot_com, F, q_ddot_uc, u_b
-    weights = jnp.array([1e4, 1e4, 1e-1, 1e0, 1e-1, 1e-1, 1e3])
+    # cent acc, cent com, f mag, q_ddot_c, qu_mag, eef_acc, u_pd
+    weights = jnp.array([1e1, 1e1, 1e-5, 1e-4, 5e-3, 1e-3, 1e-1])
     mat_height = 6 + 6 + ids["ctrl_num"] * 2 + 6 * ids["eef_num"]
     uc_size = ids["ctrl_num"] + 6
     F_size = ids["eef_num"] * 6
@@ -171,10 +172,16 @@ def maqp(m, h, w, a_stc,
     qp_q = jnp.zeros((mat_height, mat_height))
     qp_c = jnp.zeros((mat_height, ))
 
+    norm_big_q = jnp.zeros([7])
+    norm_small_q = jnp.zeros([7])
+
     big_q_com, small_q_com = centroidal_acc_q(com_ref)
 
     big_q_com *= weights[0]
     small_q_com *= weights[0]
+
+    norm_big_q = norm_big_q.at[0].set(jnp.linalg.norm(big_q_com))
+    norm_small_q = norm_small_q.at[0].set(jnp.linalg.norm(small_q_com))
 
     qp_q = qp_q.at[:6, :6].add(big_q_com)
     qp_c = qp_c.at[:6].add(small_q_com)
@@ -182,6 +189,9 @@ def maqp(m, h, w, a_stc,
     big_q_cent, small_q_cent = centroidal_cons_q(a, g)
     big_q_cent *= weights[1]
     small_q_cent *= weights[1]
+
+    norm_big_q = norm_big_q.at[1].set(jnp.linalg.norm(big_q_cent))
+    norm_small_q = norm_small_q.at[1].set(jnp.linalg.norm(small_q_cent))
 
     qp_q = qp_q.at[:(6 + F_size), :(6 + F_size)].add(big_q_cent)
     qp_c = qp_c.at[:(6 + F_size)].add(small_q_cent)
@@ -191,12 +201,18 @@ def maqp(m, h, w, a_stc,
     big_q_f *= weights[2]
     small_q_f *= weights[2]
 
+    norm_big_q = norm_big_q.at[2].set(jnp.linalg.norm(big_q_f))
+    norm_small_q = norm_small_q.at[2].set(jnp.linalg.norm(small_q_f))
+
     qp_q = qp_q.at[6: 6 + F_size, 6: 6 + F_size].add(big_q_f)
     qp_c = qp_c.at[6: 6 + F_size].add(small_q_f)
 
     big_q_qc, small_q_qc = q_ddot_c_q(ids)
     big_q_qc *= weights[3]
     small_q_qc *= weights[3]
+
+    norm_big_q = norm_big_q.at[3].set(jnp.linalg.norm(big_q_qc))
+    norm_small_q = norm_small_q.at[3].set(jnp.linalg.norm(small_q_qc))
 
     qp_q = qp_q.at[12 + F_size: 12 + F_size + ids["ctrl_num"],
                    12 + F_size: 12 + F_size + ids["ctrl_num"]].add(big_q_qc)
@@ -206,12 +222,18 @@ def maqp(m, h, w, a_stc,
     big_q_qu *= weights[4]
     small_q_qu *= weights[4]
 
+    norm_big_q = norm_big_q.at[4].set(jnp.linalg.norm(big_q_qu))
+    norm_small_q = norm_small_q.at[4].set(jnp.linalg.norm(small_q_qu))
+
     qp_q = qp_q.at[6 + F_size: 12 + F_size, 6 + F_size: 12 + F_size].add(big_q_qu)
     qp_c = qp_c.at[6 + F_size: 12 + F_size].add(small_q_qu)
 
     big_q_acc, small_q_acc = eefs_acc_q(s, jacs, jvp, a_stc, ids)
     big_q_acc *= weights[5]
     small_q_acc *= weights[5]
+
+    norm_big_q = norm_big_q.at[5].set(jnp.linalg.norm(big_q_acc))
+    norm_small_q = norm_small_q.at[5].set(jnp.linalg.norm(small_q_acc))
     
     qp_q = qp_q.at[6 + F_size:mat_height - u_size, 
                    6 + F_size:mat_height - u_size].add(big_q_acc)
@@ -220,6 +242,10 @@ def maqp(m, h, w, a_stc,
     big_q_u, small_q_u = u_pd_q(qc_weight, u_ref, ids)
     big_q_u *= weights[6]
     small_q_u *= weights[6]
+
+    norm_big_q = norm_big_q.at[6].set(jnp.linalg.norm(big_q_u))
+    norm_small_q = norm_small_q.at[6].set(jnp.linalg.norm(small_q_u))
+
     qp_q = qp_q.at[mat_height - u_size:, mat_height - u_size:].add(big_q_u)
     qp_c = qp_c.at[mat_height - u_size:].add(small_q_u)
 
@@ -262,35 +288,40 @@ def maqp(m, h, w, a_stc,
 
     q_ddot_com = sol[:6]
     f = sol[6:6 + ids["eef_num"] * 6]
-    q_ddot_uc = sol[6 + ids["eef_num"] * 6:]
+    q_ddot_uc = sol[6 + ids["eef_num"] * 6:12 + ids["eef_num"] * 6 + ids["ctrl_num"]]
 
     ub = sol[mat_height - u_size:]
 
-    if (not is_mjx) and debug:
-        
-        # Existing prints
-        print(f, q_ddot_com)
-        print("amat2", a @ f + g)
-        print("lhs ", cons_lhs.shape, jnp.linalg.matrix_rank(cons_lhs))
+    debug_dict = {
+        "norm_big_q": norm_big_q,
+        "norm_small_q": norm_small_q,
+    }
 
-        mu_uc = m[:6, :]
-        ju = jacs[:, :6]
-        uu = mu_uc @ q_ddot_uc + h[:6] - ju.T @ f
-        print("uu ", uu)
-        print("mu_uc  comp ", mu_uc @ q_ddot_uc)
-        print("juT ", ju.T @ f)
-        print("h_u ", h[:6])
-        print("q_ddot_u", q_ddot_uc[0:6])
-        print("q_ddot_c", q_ddot_uc[6:])
-        print("com_jvp ", com_jvp)
-        print("com_jac ", com_jac)
+    if debug:
+        big_q_com, small_q_com = centroidal_acc_q(com_ref)
+        centroidal_error = eval_qp(big_q_com, small_q_com, q_ddot_com)
+        big_q_com, small_q_com = centroidal_cons_q(a, g)
+        centroidal_cons_error = eval_qp(big_q_com, small_q_com, 
+                                        jnp.concatenate([q_ddot_com, f], axis = 0))
+        big_q_f, small_q_f = f_mag_q(w, ids)
+        f_mag_error = eval_qp(big_q_f, small_q_f, f)
+        big_q_qc, small_q_qc = q_ddot_c_q(ids)
+        q_ddot_c_error = eval_qp(big_q_qc, small_q_qc, q_ddot_uc[6:])
+        big_q_qu, small_q_qu = qu_mag_q()
+        qu_mag_error = eval_qp(big_q_qu, small_q_qu, q_ddot_uc[:6])
+        big_q_acc, small_q_acc = eefs_acc_q(s, jacs, jvp, a_stc, ids)
+        eef_accs_error = eval_qp(big_q_acc, small_q_acc, 
+                                q_ddot_uc)
+        big_q_u, small_q_u = u_pd_q(qc_weight, u_ref, ids)
+        u_pd_error = eval_qp(big_q_u, small_q_u, ub)
+        errors = jnp.array([centroidal_error, centroidal_cons_error, f_mag_error, 
+                            q_ddot_c_error, qu_mag_error, eef_accs_error, u_pd_error])
+        debug_dict["errors"] = errors * weights
+    return ub, f, q_ddot_com, debug_dict
 
-        exp_com = com_jac @ q_ddot_uc + com_jvp
-        print("exp_com ", exp_com)
-
-        print("cons_mul: ", cons_lhs @ sol - cons_rhs)
-
-    return ub, f, q_ddot_com
+def eval_qp(big_q, small_q, x):
+    res = 0.5 * x.T @ big_q @ x - small_q.T @ x
+    return res
 
 def centroidal_qp(m, w,
          eefpos, com_pos, 
@@ -427,12 +458,12 @@ def step(model, data, act, ids, is_mjx = False, debug = False):
         model, data, ids, is_mjx = is_mjx)
     a_stc = jnp.zeros(6 * ids["eef_num"])
     #s = jnp.where(nn.sigmoid(w) > 0.5, 1.0, 0.0)
-    u, f, q_ddot_com = maqp(m, h, w, a_stc,
+    u, f, q_ddot_com, norm_dict = maqp(m, h, w, a_stc,
                 eefpos, com_pos,
                 jacs, jvp,
                 jac_com, com_jvp,
                 com_accs,
-                qc_weight, pd_tau, ids, is_mjx = is_mjx)
+                qc_weight, pd_tau, ids, is_mjx = is_mjx, debug = debug)
     u = jnp.nan_to_num(u, posinf = 0.0, neginf = 0.0, nan = 0.0)
 
     #u_final = u * (pd_weight) + pd_tau * (1.0 - pd_weight)
@@ -451,6 +482,9 @@ def step(model, data, act, ids, is_mjx = False, debug = False):
             "real_com_vel": data.qvel[0:3],
             "real_angvel": data.qvel[3:6],
             "qc_weight": qc_weight,
+            "norm_big_q": norm_dict["norm_big_q"],
+            "norm_small_q": norm_dict["norm_small_q"],
+            "qp_errors": norm_dict["errors"]
         }
         return debug_info
     else:

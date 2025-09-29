@@ -160,6 +160,96 @@ def plot_qc_weight_cols_11_16(qc_weight: np.ndarray, *, suptitle: str = "qc_weig
     return fig, axes
 
 
+def plot_norms(norm_big_q: np.ndarray, norm_small_q: np.ndarray, names: list[str], *,
+               suptitle: str = "norm_big_q & norm_small_q components", layout: str = "2x7",
+               save_path: str | None = None):
+    """Plot 14 subplots: first 7 from norm_big_q columns, next 7 from norm_small_q.
+    norm_big_q, norm_small_q: (n,7) arrays; names: list of 7 labels for columns.
+    layout: "2x7" (2 rows, 7 cols) or "7x2".
+    """
+    norm_big_q = np.asarray(norm_big_q)
+    norm_small_q = np.asarray(norm_small_q)
+    if norm_big_q.ndim != 2 or norm_small_q.ndim != 2:
+        raise ValueError("Inputs must be 2D arrays")
+    if norm_big_q.shape[1] != 7 or norm_small_q.shape[1] != 7:
+        raise ValueError("Expect exactly 7 columns in each input")
+    if len(names) != 7:
+        raise ValueError("names list must have length 7")
+    n = min(norm_big_q.shape[0], norm_small_q.shape[0])
+    t = np.arange(n)
+
+    if layout == "2x7":
+        fig, axes = plt.subplots(2, 7, figsize=(18, 5), sharex=True)
+        big_axes = axes[0]
+        small_axes = axes[1]
+    elif layout == "7x2":
+        fig, axes = plt.subplots(7, 2, figsize=(10, 16), sharex=True)
+        big_axes = axes[:, 0]
+        small_axes = axes[:, 1]
+    else:
+        raise ValueError("layout must be '2x7' or '7x2'")
+
+    # Plot big_q components
+    for i in range(7):
+        ax = big_axes[i]
+        ax.plot(t, norm_big_q[:n, i], linewidth=1.1)
+        ax.set_title(f"big {names[i]}")
+        ax.grid(True, linestyle='--', alpha=0.3)
+        if layout == "2x7" and i == 0:
+            ax.set_ylabel('norm_big_q')
+        if layout == "7x2":
+            ax.set_ylabel(names[i])
+
+    # Plot small_q components
+    for i in range(7):
+        ax = small_axes[i]
+        ax.plot(t, norm_small_q[:n, i], linewidth=1.1, color='tab:orange')
+        ax.set_title(f"small {names[i]}")
+        ax.grid(True, linestyle='--', alpha=0.3)
+        if layout == "2x7" and i == 0:
+            ax.set_ylabel('norm_small_q')
+        if layout == "7x2":
+            ax.set_ylabel(names[i])
+        ax.set_xlabel('timestep')
+
+    fig.suptitle(suptitle)
+    fig.tight_layout(rect=(0, 0, 1, 0.95))
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        fig.savefig(save_path, dpi=150)
+    return fig, axes
+
+
+def plot_qp_errors(qp_errors: np.ndarray, names: list[str], *, suptitle: str = "QP error components", save_path: str | None = None):
+    """Plot 7 subplots (1 row) for qp_errors columns.
+    qp_errors: (n,7) array; names: list of 7 labels.
+    """
+    qp_errors = np.asarray(qp_errors)
+    if qp_errors.ndim != 2 or qp_errors.shape[1] != 7:
+        raise ValueError("qp_errors must have shape (n,7)")
+    if len(names) != 7:
+        raise ValueError("names must have length 7")
+    n = qp_errors.shape[0]
+    t = np.arange(n)
+    fig, axes = plt.subplots(1, 7, figsize=(18, 3.2), sharex=True)
+    if not isinstance(axes, np.ndarray):
+        axes = np.array([axes])
+    for i in range(7):
+        ax = axes[i]
+        ax.plot(t, qp_errors[:, i], linewidth=1.1)
+        ax.set_title(names[i])
+        ax.grid(True, linestyle='--', alpha=0.3)
+        if i == 0:
+            ax.set_ylabel('error')
+        ax.set_xlabel('t')
+    fig.suptitle(suptitle)
+    fig.tight_layout(rect=(0, 0, 1, 0.92))
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        fig.savefig(save_path, dpi=150)
+    return fig, axes
+
+
 def main():
     pd_tau_path = os.path.join('data', 'pd_tau.csv')
     u_path = os.path.join('data', 'u.csv')
@@ -181,6 +271,11 @@ def main():
     qacc_c = load_matrix(os.path.join('data', 'qacc_c.csv'))
 
     qc_weight = load_matrix(os.path.join('data', 'qc_weight.csv'))
+
+    norm_big_q = load_matrix(os.path.join('data', 'norm_big_q.csv'))
+    norm_small_q = load_matrix(os.path.join('data', 'norm_small_q.csv'))
+
+    qp_errors = load_matrix(os.path.join('data', 'qp_errors.csv'))
 
     range_lower = 300
     range_upper = 500
@@ -261,6 +356,17 @@ def main():
 
     # New: plot for qc_weight cols 11..16
     plot_qc_weight_cols_11_16(qc_weight[range_lower:range_upper, :], save_path=os.path.join('data', 'qc_weight_cols_11_16.png'))
+
+    # New: plot for norm_big_q and norm_small_q
+    plot_norms(norm_big_q[range_lower:range_upper, :], 
+               norm_small_q[range_lower:range_upper, :], 
+               names=["cent acc", "cent cons", "f mag", "q_ddot_c", "qu mag", "eef accs", "u pd"],
+               save_path=os.path.join('data', 'norms.png'))
+
+    # New: plot for qp_errors
+    plot_qp_errors(qp_errors[range_lower:range_upper, :], 
+                   names=["cent acc", "cent cons", "f mag", "q_ddot_c", "qu mag", "eef accs", "u pd"],
+                   save_path=os.path.join('data', 'qp_errors.png'))
 
     plt.show()
 
