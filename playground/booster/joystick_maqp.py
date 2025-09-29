@@ -102,10 +102,10 @@ def default_config() -> config_dict.ConfigDict:
               feet_distance=-1.0,
               collision=-1.0,
               pbc_w=-1.0,
-              qc_weight=0.05,
+              qc_weight=-0.50,
               maqp_cons=0.50,
-              vel_def=0.30,
-              vel_action_rate = -0.005
+              vel_def=1.0,
+              vel_action_rate = -0.001
           ),
           tracking_sigma=0.25,
           max_foot_height=0.12,
@@ -621,7 +621,7 @@ class Joystick(t1_base.T1Env):
     lin_vel_error = jp.sum(jp.square(lin_vel[:2] - components["des_com_vel"][:2]))
     linvel_rew = jp.exp(-lin_vel_error / self._config.reward_config.tracking_sigma)
 
-    return rew_vel_lim * 0.5 + linvel_rew
+    return rew_vel_lim * 0.1 + linvel_rew
   
   def _reward_maqp_cons(self, data, info, action):
     debug_dict = maqp.step(self._mjx_model, 
@@ -687,8 +687,7 @@ class Joystick(t1_base.T1Env):
 
     ref = ref * (1.0 - mask)
 
-    rew = jp.sum(jp.square(logits["qc_weight"] - ref))
-    rew = jp.exp(-rew / 2.0)
+    rew = jp.mean(jp.square(logits["qc_weight"] - ref))
 
     return rew
 

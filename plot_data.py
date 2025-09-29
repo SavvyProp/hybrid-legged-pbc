@@ -127,6 +127,39 @@ def plot_qddot_com_vs_ref(q_ddot_com: np.ndarray, com_ref: np.ndarray, *, suptit
     return fig, axes
 
 
+def plot_qc_weight_cols_11_16(qc_weight: np.ndarray, *, suptitle: str = "qc_weight cols 11–16", save_path: str | None = None):
+    """Plot 6 subplots for qc_weight columns 11..16 (1-based indexing).
+    qc_weight: (n, >=16) array. Returns (fig, axes).
+    """
+    assert qc_weight.ndim == 2 and qc_weight.shape[1] >= 16, "qc_weight must have at least 16 columns"
+    idxs = np.arange(11, 17)  # 0-based indices for columns 11..16
+    n = qc_weight.shape[0]
+    t = np.arange(n)
+
+    fig, axes = plt.subplots(2, 3, figsize=(12, 6), sharex=True)
+    axes = axes.ravel()
+    for i, col in enumerate(idxs):
+        ax = axes[i]
+        ax.plot(t, qc_weight[:, col], linewidth=1.2)
+        title = f"col {col+1} qc_weight"
+        try:
+            title = f"{bids.joint_names[col]} qc_w"  # use joint name if available
+        except Exception:
+            pass
+        ax.set_title(title)
+        ax.grid(True, linestyle='--', alpha=0.3)
+        if i % 3 == 0:
+            ax.set_ylabel('weight')
+        if i // 3 == 1:
+            ax.set_xlabel('timestep')
+    fig.suptitle(suptitle)
+    fig.tight_layout(rect=(0, 0, 1, 0.96))
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        fig.savefig(save_path, dpi=150)
+    return fig, axes
+
+
 def main():
     pd_tau_path = os.path.join('data', 'pd_tau.csv')
     u_path = os.path.join('data', 'u.csv')
@@ -146,6 +179,8 @@ def main():
 
     q_ddot_uc = load_matrix(os.path.join('data', 'q_ddot_uc.csv'))
     qacc_c = load_matrix(os.path.join('data', 'qacc_c.csv'))
+
+    qc_weight = load_matrix(os.path.join('data', 'qc_weight.csv'))
 
     range_lower = 300
     range_upper = 500
@@ -223,6 +258,9 @@ def main():
     # New: plot for q_ddot_com vs com_ref
     plot_qddot_com_vs_ref(q_ddot_com[range_lower:range_upper, :], 
                           com_ref[range_lower:range_upper, :], save_path=os.path.join('data', 'q_ddot_com_vs_com_ref.png'))
+
+    # New: plot for qc_weight cols 11..16
+    plot_qc_weight_cols_11_16(qc_weight[range_lower:range_upper, :], save_path=os.path.join('data', 'qc_weight_cols_11_16.png'))
 
     plt.show()
 

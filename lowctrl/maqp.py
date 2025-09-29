@@ -451,6 +451,7 @@ def step(model, data, act, ids, is_mjx = False, debug = False):
             "des_angvel": des_angvel,
             "real_com_vel": data.qvel[0:3],
             "real_angvel": data.qvel[3:6],
+            "qc_weight": qc_weight,
         }
         return debug_info
     else:
@@ -672,7 +673,6 @@ def raise_right_leg(com_pos, data, t, tmax, ids):
     ang_vel_norm = jnp.clip(jnp.linalg.norm(ang_vel), min = 0.0, max = 3.0)
 
     ang_vel = ang_vel * ang_vel_norm / (jnp.linalg.norm(ang_vel)  + 1e-6)
-
 
     act = act.at[ids["ctrl_num"] + 3: ids["ctrl_num"] + 6].set(ang_vel)
     return act

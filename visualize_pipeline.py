@@ -59,7 +59,7 @@ def debug_eefpbc(state, prev_info, act, i):
     #print("u_change:", jnp.sum(jnp.square(current_u - prev_u)))
     #print("logits qp_weight:", logits["qc_weight"])
 
-dir = "training/test_maqpt"
+dir = "training/test_maqpt_1"
 
 model_path = dir + "/walk_policy"
 saved_params = model.load_params(model_path)
@@ -81,7 +81,12 @@ obs_list = []
 nn_p_list = []
 states = []
 prev_info = state.info
+
+
+command = jnp.array([0.5, 0.0, 0.0])
+
 for c in range(1000):
+    state.info["command"] = command
     act_rng, rng = jax.random.split(rng)
     obs_list += [state.obs]
     ctrl, _ = jit_inference_fn(state.obs, act_rng)
