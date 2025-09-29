@@ -76,7 +76,7 @@ def eefs_acc_q(s, jacs, jvp, a_stc, ids):
 
 def u_pd_q(qc_weight, u_ref, ids):
     big_c = jnp.eye(ids["ctrl_num"]) * qc_weight[:, None]
-    big_c = big_c + jnp.eye(ids["ctrl_num"]) * 1e-1
+    big_c = big_c + jnp.eye(ids["ctrl_num"]) * 1e-2
     big_q = big_c.T @ big_c
     small_q = big_c.T @ u_ref
     return big_q, small_q
@@ -144,7 +144,7 @@ def maqp(m, h, w, a_stc,
     s = nn.sigmoid(w)
     
     # q_ddot_com, F, q_ddot_uc, u_b
-    weights = jnp.array([1e4, 1e4, 1e-1, 1e0, 1e-1, 1e-1, 1e2])
+    weights = jnp.array([1e4, 1e4, 1e-1, 1e0, 1e-1, 1e-1, 1e3])
     mat_height = 6 + 6 + ids["ctrl_num"] * 2 + 6 * ids["eef_num"]
     uc_size = ids["ctrl_num"] + 6
     F_size = ids["eef_num"] * 6
@@ -354,15 +354,12 @@ def ctrl2logits(act, ids):
     des_com_angvel = act[ids["ctrl_num"] + 3 : ids["ctrl_num"] + 6]
     w = act[ids["ctrl_num"] + 6 : ids["ctrl_num"] + ids["eef_num"] + 6]
     qc_weight = act[ids["ctrl_num"] + ids["eef_num"] + 6 : ids["ctrl_num"] * 2 + ids["eef_num"] + 6]
-    pd_weight = act[ids["ctrl_num"] * 2 + ids["eef_num"] + 6:
-                    ids["ctrl_num"] * 3 + ids["eef_num"] + 6]
     logits = {
         "des_pos": des_pos,
         "des_com_vel": des_com_vel,
         "des_com_angvel": des_com_angvel,
         "w": w,
         "qc_weight": qc_weight,
-        "pd_weight": pd_weight
     }
     return logits
 
@@ -380,14 +377,12 @@ def ctrl2components(act, ids):
     des_com_vel = des_com_vel * (des_com_vel_mag / (1e-6 + jnp.linalg.norm(des_com_vel)))
     qc_weight = nn.sigmoid(logits["qc_weight"])
     w = logits["w"]
-    pd_weight = nn.sigmoid(logits["pd_weight"])
     outputs = {
         "des_pos": des_pos,
         "des_com_vel": des_com_vel,
         "des_com_angvel": des_angvel,
         "w": w,
         "qc_weight": qc_weight,
-        "pd_weight": pd_weight
     }
     return outputs
 
@@ -419,7 +414,6 @@ def step(model, data, act, ids, is_mjx = False, debug = False):
     des_angvel = output["des_com_angvel"]
     w = output["w"]
     qc_weight = output["qc_weight"]
-    pd_weight = output["pd_weight"]
 
     p_weight = ids["p_gains"]
     d_weight = ids["d_gains"]
@@ -442,10 +436,10 @@ def step(model, data, act, ids, is_mjx = False, debug = False):
                 qc_weight, pd_tau, ids, is_mjx = is_mjx)
     u = jnp.nan_to_num(u, posinf = 0.0, neginf = 0.0, nan = 0.0)
 
-    u_final = u * (pd_weight) + pd_tau * (1.0 - pd_weight)
+    #u_final = u * (pd_weight) + pd_tau * (1.0 - pd_weight)
 
     tau_limits = ids["tau_limits"]
-    u_final = jnp.clip(u_final, -tau_limits, tau_limits)
+    u_final = jnp.clip(u, -tau_limits, tau_limits)
     if debug:
         debug_info = {
             "pd_tau": pd_tau,
@@ -487,8 +481,7 @@ def default_act(ids):
     w = jnp.array([10., 10., -5., -5.])
     qc_weight = jnp.ones([ids["ctrl_num"]]) * -3
     qc_weight = qc_weight.at[0:11].set(1.0)
-    pd_weight = jnp.ones([ids["ctrl_num"]]) * 2.0
-    act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w, qc_weight, pd_weight], axis = 0)
+    act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w, qc_weight], axis = 0)
     return act
 
 def default_act_lock_com(com_pos, data, ids):
@@ -651,8 +644,7 @@ def raise_right_leg(com_pos, data, t, tmax, ids):
     qc_weight = jnp.ones([ids["ctrl_num"]]) * -3
     qc_weight = qc_weight.at[0:11].set(3.0)
     qc_weight = qc_weight.at[17:].set(3.0)
-    pd_weight = jnp.ones([ids["ctrl_num"]]) * 2.0
-    act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w, qc_weight, pd_weight], axis = 0)
+    act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w, qc_weight], axis = 0)
     
     com_pos = com_pos + jnp.array([0.0, 0.05, 0.0])
     current_com = data.subtree_com[0]

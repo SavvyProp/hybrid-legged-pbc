@@ -103,8 +103,7 @@ def default_config() -> config_dict.ConfigDict:
               collision=-1.0,
               pbc_w=-1.0,
               qc_weight=0.05,
-              select=0.25,
-              maqp_cons=1.0,
+              maqp_cons=0.50,
               vel_def=0.40,
               vel_action_rate = -0.005
           ),
@@ -587,7 +586,6 @@ class Joystick(t1_base.T1Env):
         "feet_distance": self._cost_feet_distance(data, info),
         "pbc_w": self._cost_pbc_w(action, contact),
         "qc_weight": self._reward_weight_logit_weight(action, contact),
-        "select": self._reward_select(action),
         "maqp_cons": self._reward_maqp_cons(data, info, action),
         "vel_def": self._reward_des_vel(action, info["command"]),
         "vel_action_rate": self._cost_vel_action_rate(action, info["last_act"]),
@@ -605,11 +603,6 @@ class Joystick(t1_base.T1Env):
     c2 = jp.sum(jp.square(angvel_act - 
                           angvel_last_act))
     return c1 + c2
-
-  def _reward_select(self, action):
-    logits = ctrl2logits(action, bids.ids)
-    mean_weight = jp.mean(nn.sigmoid(logits["pd_weight"]))
-    return mean_weight
   
   def _reward_des_vel(self, action, lin_vel):
     components = maqp.ctrl2components(action, self.ids)
