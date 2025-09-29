@@ -292,7 +292,6 @@ def maqp(m, h, w, a_stc,
 
     return ub, f, q_ddot_com
 
-
 def centroidal_qp(m, w,
          eefpos, com_pos, 
          jacs, 
