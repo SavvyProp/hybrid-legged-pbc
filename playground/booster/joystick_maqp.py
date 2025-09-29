@@ -80,7 +80,7 @@ def default_config() -> config_dict.ConfigDict:
               base_height=0.0,
               # Energy related rewards.
               torques=0.0,
-              action_rate=-0.0001,
+              action_rate=0.000,
               energy=0.0,
               dof_acc=0.0,
               dof_vel=0.0,
@@ -104,7 +104,7 @@ def default_config() -> config_dict.ConfigDict:
               pbc_w=-1.0,
               qc_weight=0.05,
               maqp_cons=0.50,
-              vel_def=0.40,
+              vel_def=0.30,
               vel_action_rate = -0.005
           ),
           tracking_sigma=0.25,
