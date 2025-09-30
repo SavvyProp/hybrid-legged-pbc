@@ -323,61 +323,6 @@ def eval_qp(big_q, small_q, x):
     res = 0.5 * x.T @ big_q @ x - small_q.T @ x
     return res
 
-def centroidal_qp(m, w,
-         eefpos, com_pos, 
-         jacs, 
-         com_ref, ids):
-    weights = jnp.array([1000.0, 1.0])
-    select = {
-        "q_ddot_com": jnp.concatenate([jnp.eye(6), jnp.zeros((6, 12))], axis = 1),
-        "F": jnp.concatenate([jnp.zeros([12, 6]), jnp.eye(12)], axis = 1),
-    }
-    a, g = make_centroidal_a(m,
-                          eefpos,
-                          com_pos,
-                          ids
-                          )
-    a = a[:, :12]
-
-    qp_q = jnp.zeros((18, 18))
-    qp_c = jnp.zeros((18, ))
-
-    big_q_com, small_q_com = centroidal_acc_q(com_ref)
-    big_q_com *= weights[0]
-    small_q_com *= weights[0]
-
-    qp_q = qp_q.at[:6, :6].add(big_q_com)
-    qp_c = qp_c.at[:6].add(small_q_com)
-
-    big_q_f, small_q_f = f_mag_q(w, ids)
-    big_q_f = big_q_f[:12, :12]
-    small_q_f = small_q_f[:12]
-    big_q_f *= weights[1]
-    small_q_f *= weights[1]
-
-    qp_q = qp_q.at[6: 18, 6: 18].add(big_q_f)
-    qp_c = qp_c.at[6: 18].add(small_q_f)
-
-    # make constraints
-    cons_lhs_list = []
-    cons_rhs_list = []
-
-    centroid_lhs1, centroid_rhs1 = centroidal_qacc_cons(select, a)
-    cons_lhs_list.append(centroid_lhs1)
-    cons_rhs_list.append(centroid_rhs1)
-
-    cons_lhs = jnp.vstack(cons_lhs_list)
-    cons_rhs = jnp.concatenate(cons_rhs_list, axis = 0)
-
-    sol = schur_solve(qp_q, qp_c, cons_lhs, cons_rhs)
-
-    q_ddot_com = sol[:6]
-    f = sol[6:]
-
-    leg_tau = jacs[:12, 6:].T @ f
-
-    return leg_tau, q_ddot_com
-
 def ctrl2logits(act, ids):
     des_pos = act[0:ids["ctrl_num"]]
     des_com_vel = act[ids["ctrl_num"]:ids["ctrl_num"] + 3]
@@ -396,7 +341,7 @@ def ctrl2logits(act, ids):
 def ctrl2components(act, ids):
     # des_pos, des_com_pos, w
     logits = ctrl2logits(act, ids)
-    des_pos = ids["default_qpos"][7:] + jnp.tanh(logits["des_pos"]) * 1.0
+    des_pos = ids["default_qpos"][7:] + jnp.tanh(logits["des_pos"] * 0.25) * 2.0
     #des_angvel = jnp.tanh(logits["des_com_angvel"]) * 1.0
     des_angvel = logits["des_com_angvel"] * 0.20
     des_angvel_mag = jnp.clip(jnp.linalg.norm(des_angvel), 0.0, 3.0)
@@ -489,23 +434,6 @@ def step(model, data, act, ids, is_mjx = False, debug = False):
         return debug_info
     else:
         return u_final
-
-
-def step_centroidal(model, data, act, ids, is_mjx = False):
-    output = ctrl2components(act, ids)
-    des_pos = output["des_pos"]
-    des_com_vel = output["des_com_vel"]
-    des_angvel = output["des_com_angvel"]
-    w = output["w"]
-    qacc_c, com_accs = highlvlPD(data, des_pos, des_com_vel, des_angvel, ids)
-    m, h, jacs, jvp, jac_com, com_jvp, eefpos, com_pos = lmodel.get_kin_values(
-        model, data, ids, is_mjx = is_mjx)
-    a_stc = jnp.zeros(6 * ids["eef_num"])
-    u = centroidal_qp(m, w,
-                eefpos, com_pos,
-                jacs,
-                com_accs, ids = ids)
-    return u
 
 def default_act(ids):
     des_pos = jnp.zeros([ids["ctrl_num"]])
