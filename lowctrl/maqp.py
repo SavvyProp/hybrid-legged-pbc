@@ -348,7 +348,7 @@ def ctrl2components(act, ids):
     #des_com_vel = jnp.tanh(logits["des_com_vel"]) * 0.7
     des_com_vel = logits["des_com_vel"] * 0.7
     qc_weight = (logits["qc_weight"] + 1) * 0.5
-    w = logits["w"]
+    w = ( logits["w"] + 1 ) * 0.5
     outputs = {
         "des_pos": des_pos,
         "des_com_vel": des_com_vel,
@@ -599,7 +599,7 @@ def raise_right_leg(com_pos, data, t, tmax, ids):
     des_com_vel = jnp.zeros([3])
     des_com_angvel = jnp.zeros([3])
     #w = jnp.ones([ids["eef_num"]]) * 4.0
-    w = jnp.array([10., -5., -5., -5.])
+    w = jnp.tanh(jnp.array([1., -5., -5., -5.]))
     qc_weight = jnp.ones([ids["ctrl_num"]]) * -3
     qc_weight = qc_weight.at[0:11].set(3.0)
     qc_weight = qc_weight.at[17:].set(3.0)
