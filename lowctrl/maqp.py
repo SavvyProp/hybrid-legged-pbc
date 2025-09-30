@@ -341,17 +341,13 @@ def ctrl2logits(act, ids):
 def ctrl2components(act, ids):
     # des_pos, des_com_pos, w
     logits = ctrl2logits(act, ids)
-    des_pos = ids["default_qpos"][7:] + jnp.tanh(logits["des_pos"] * 0.25) * 2.0
+    des_pos = ids["default_qpos"][7:] + logits["des_pos"] * 2.0
     #des_angvel = jnp.tanh(logits["des_com_angvel"]) * 1.0
-    des_angvel = logits["des_com_angvel"] * 0.20
-    des_angvel_mag = jnp.clip(jnp.linalg.norm(des_angvel), 0.0, 3.0)
-    des_angvel = des_angvel * (des_angvel_mag / (1e-6 + jnp.linalg.norm(des_angvel)))
+    des_angvel = logits["des_com_angvel"] * 3.0
     #des_com_vel = jnp.tanh(logits["des_com_vel"]) * 0.7
-    des_com_vel = logits["des_com_vel"] * 0.05
-    des_com_vel_mag = jnp.clip(jnp.linalg.norm(des_com_vel), 0.0, 0.7)
-    des_com_vel = des_com_vel * (des_com_vel_mag / (1e-6 + jnp.linalg.norm(des_com_vel)))
-    qc_weight = nn.sigmoid(logits["qc_weight"])
-    w = logits["w"]
+    des_com_vel = logits["des_com_vel"] * 0.7
+    qc_weight = (logits["qc_weight"] + 1) * 0.5
+    w = logits["w"] * 5.0
     outputs = {
         "des_pos": des_pos,
         "des_com_vel": des_com_vel,
