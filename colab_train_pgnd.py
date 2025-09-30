@@ -4,10 +4,10 @@ from playground.booster.randomize import domain_randomize
 from datetime import datetime
 import functools
 import matplotlib.pyplot as plt
-from brax.training.agents.ppo import networks as ppo_networks
 from brax.training.agents.ppo import train as ppo
 from mujoco_playground import wrapper
 from playground.booster.config import ppo_params
+from networks.softplus_mlp import make_ppo_networks
 
 def make_trainfn():
     env_cfg = joystick.default_config()
@@ -35,11 +35,11 @@ def make_trainfn():
 
     ppo_training_params = dict(ppo_params)
 
-    network_factory = ppo_networks.make_ppo_networks
+    network_factory = make_ppo_networks
     if "network_factory" in ppo_params:
         del ppo_training_params["network_factory"]
     network_factory = functools.partial(
-        ppo_networks.make_ppo_networks,
+        make_ppo_networks,
         **ppo_params.network_factory
     )
 

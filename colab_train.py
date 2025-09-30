@@ -4,7 +4,8 @@ import functools
 from brax import envs
 #from brax.training.agents.ppo import train as ppo
 from agents.ppo import train
-from brax.training.agents.ppo import networks as ppo_networks
+#from brax.training.agents.ppo import networks as ppo_networks
+from networks.softplus_mlp import make_ppo_networks
 import networks.mlp as mlp
 from brax.io import model
 from matplotlib import pyplot as plt
@@ -15,8 +16,7 @@ def make_trainfn():
     env = envs.get_environment('FlatwalkEnv')
     eval_env = envs.get_environment('FlatwalkEnv')    
     make_networks_factory = functools.partial(
-        #mlp.make_ppo_networks, 
-        ppo_networks.make_ppo_networks,
+        make_ppo_networks,
         value_hidden_layer_sizes=(512, 256, 256, 128),
         policy_hidden_layer_sizes=(1024, 512, 512, 256, 256),
         distribution_type = "normal",
