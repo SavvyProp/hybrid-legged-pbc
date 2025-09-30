@@ -146,7 +146,7 @@ def maqp(m, h, w, a_stc,
     
     # q_ddot_com, F, q_ddot_uc, u_b
     # cent acc, cent com, f mag, q_ddot_c, qu_mag, eef_acc, u_pd
-    weights = jnp.array([1e1, 1e1, 1e-5, 1e-4, 5e-3, 1e-3, 1e-1])
+    weights = jnp.array([1e1, 1e1, 1e-4, 1e-4, 5e-3, 1e-3, 5e-1])
     mat_height = 6 + 6 + ids["ctrl_num"] * 2 + 6 * ids["eef_num"]
     uc_size = ids["ctrl_num"] + 6
     F_size = ids["eef_num"] * 6
@@ -419,6 +419,7 @@ def step(model, data, act, ids, is_mjx = False, debug = False):
             "f": f,
             "q_ddot_com": q_ddot_com,
             "com_ref": com_accs,
+            "des_pos": des_pos,
             "des_com_vel": world_com_vel,
             "des_angvel": des_angvel,
             "real_com_vel": data.qvel[0:3],
@@ -437,41 +438,11 @@ def default_act(ids):
     des_com_vel = jnp.zeros([3])
     des_com_angvel = jnp.zeros([3])
     #w = jnp.ones([ids["eef_num"]]) * 4.0
-    w = jnp.array([10., 10., -5., -5.])
-    qc_weight = jnp.ones([ids["ctrl_num"]]) * -3
-    qc_weight = qc_weight.at[0:11].set(1.0)
+    w = jnp.tanh(jnp.array([10., 10., -5., -5.]))
+    qc_weight = jnp.tanh(jnp.ones([ids["ctrl_num"]]) * -3)
+    qc_weight = qc_weight.at[0:11].set(0.99)
     act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w, qc_weight], axis = 0)
     return act
-
-def default_act_lock_com(com_pos, data, ids):
-    act = default_act(ids)
-    # Set controller to lock com position
-    current_com = data.subtree_com[0]
-    vel_mag = 0.5
-    point_vec = com_pos - current_com
-    point_vec = vel_mag * point_vec / jnp.linalg.norm(point_vec + 1e-6)
-    des_com_vel = point_vec
-    act = act.at[ids["ctrl_num"]:ids["ctrl_num"] + 3].set(des_com_vel)
-
-    # Set controller to lock base orientation
-
-    A = data.qpos[3:7]
-
-    B = ids["default_qpos"][3:7]
-
-    ang_disp = lmath.angular_displacement_from_A_to_B(A, B)
-
-    ang_vel = ang_disp * 1.0
-
-    ang_vel_norm = jnp.clip(jnp.linalg.norm(ang_vel), min = 0.0, max = 3.0)
-
-    ang_vel = ang_vel * ang_vel_norm / (jnp.linalg.norm(ang_vel)  + 1e-6)
-
-
-    act = act.at[ids["ctrl_num"] + 3: ids["ctrl_num"] + 6].set(ang_vel)
-
-    return act
-
 
 def default_act_lock_com(com_pos, data, ids):
     act = default_act(ids)
@@ -588,8 +559,8 @@ def shift_com_pos(com_pos, data, t, tmax, ids, delta = jnp.array([0.0, 0.04, 0.0
 
 def raise_right_leg(com_pos, data, t, tmax, ids):
     target_pose = jnp.zeros([ids["ctrl_num"]])
-    target_pose = target_pose.at[17].set(-1.0)
-    target_pose = target_pose.at[20].set(2.0)
+    target_pose = target_pose.at[17].set(-0.5)
+    target_pose = target_pose.at[20].set(0.7)
     
     des_pos = jnp.zeros([ids["ctrl_num"]])
     # -0.7 on right hip, +1 on right knee
@@ -603,6 +574,7 @@ def raise_right_leg(com_pos, data, t, tmax, ids):
     qc_weight = jnp.ones([ids["ctrl_num"]]) * -3
     qc_weight = qc_weight.at[0:11].set(3.0)
     qc_weight = qc_weight.at[17:].set(3.0)
+    qc_weight = jnp.tanh(qc_weight)
     act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w, qc_weight], axis = 0)
     
     com_pos = com_pos + jnp.array([0.0, 0.05, 0.0])
