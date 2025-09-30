@@ -157,7 +157,6 @@ def make_ppo_networks(
       hidden_layer_sizes=value_hidden_layer_sizes,
       activation=activation,
       obs_key=value_obs_key,
-      kernel_init=value_network_kernel_init_fn(**value_kernel_init_kwargs),
   )
 
   return PPONetworks(
