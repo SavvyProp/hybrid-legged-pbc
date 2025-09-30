@@ -396,7 +396,7 @@ def ctrl2logits(act, ids):
 def ctrl2components(act, ids):
     # des_pos, des_com_pos, w
     logits = ctrl2logits(act, ids)
-    des_pos = ids["default_qpos"][7:] + jnp.tanh(logits["des_pos"]) * 1.0
+    des_pos = ids["default_qpos"][7:] + jnp.tanh(logits["des_pos"]) * 2.0
     #des_angvel = jnp.tanh(logits["des_com_angvel"]) * 1.0
     des_angvel = logits["des_com_angvel"] * 0.20
     des_angvel_mag = jnp.clip(jnp.linalg.norm(des_angvel), 0.0, 3.0)
