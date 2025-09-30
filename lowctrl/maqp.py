@@ -40,8 +40,9 @@ def centroidal_cons_q(a, g):
     return big_q, small_q
 
 def f_mag_q(w, ids):
-    logits = -jnp.clip(w, -6.0, 6.0)
-    big_qp = lmath.vec2diags(jnp.exp(logits), ids)
+    logits = (1 / w) - 1
+    logits = jnp.clip(logits, 0.0, 2000.0)
+    big_qp = lmath.vec2diags(logits, ids)
     big_qp += jnp.eye(6 * ids["eef_num"]) * 1
     tau_cost = lmath.torqueCost(20.0, ids)
     big_qp = tau_cost @ big_qp 
@@ -141,7 +142,7 @@ def maqp(m, h, w, a_stc,
          com_jac, com_jvp, 
          com_ref, qc_weight, u_ref, ids, is_mjx = True, debug = False):
     
-    s = nn.sigmoid(w)
+    s = w
     
     # q_ddot_com, F, q_ddot_uc, u_b
     # cent acc, cent com, f mag, q_ddot_c, qu_mag, eef_acc, u_pd
@@ -347,7 +348,7 @@ def ctrl2components(act, ids):
     #des_com_vel = jnp.tanh(logits["des_com_vel"]) * 0.7
     des_com_vel = logits["des_com_vel"] * 0.7
     qc_weight = (logits["qc_weight"] + 1) * 0.5
-    w = logits["w"] * 5.0
+    w = logits["w"]
     outputs = {
         "des_pos": des_pos,
         "des_com_vel": des_com_vel,
