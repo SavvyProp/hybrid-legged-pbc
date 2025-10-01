@@ -352,7 +352,7 @@ def step(model, data, act, ids, is_mjx = False,
                 com_accs,
                 qacc_c, ids, is_mjx = is_mjx, debug = debug)
     u = jnp.nan_to_num(u, posinf = 0.0, neginf = 0.0, nan = 0.0)
-    u = u + pd_tau
+    u = u * 0.1 + pd_tau
 
     #u_final = u * (pd_weight) + pd_tau * (1.0 - pd_weight)
 
