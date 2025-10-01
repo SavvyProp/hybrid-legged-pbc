@@ -277,6 +277,8 @@ def main():
 
     qp_errors = load_matrix(os.path.join('data', 'qp_errors.csv'))
 
+    u_final = load_matrix(os.path.join('data', 'u_final.csv'))
+
     range_lower = 300
     range_upper = 500
 
@@ -326,9 +328,9 @@ def main():
     fig.savefig(out_path, dpi=150)
 
     # New: focused plot for cols 11..16 (1-based)
-    plot_cols_11_16_overlaid(pd_tau[range_lower:range_upper, :], 
+    plot_cols_11_16_overlaid(u_final[range_lower:range_upper, :], 
                              u[range_lower:range_upper, :], 
-                             legend=['pd_tau', 'u'],
+                             legend=['u_filt', 'u'],
                              ylabel='torque (Nm)',
                              save_path=os.path.join('data', 'u_pd_tau_cols_11_16.png'))
     
