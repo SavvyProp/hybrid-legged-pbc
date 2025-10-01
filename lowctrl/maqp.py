@@ -263,13 +263,11 @@ def ctrl2logits(act, ids):
     des_com_vel = act[ids["ctrl_num"]:ids["ctrl_num"] + 3]
     des_com_angvel = act[ids["ctrl_num"] + 3 : ids["ctrl_num"] + 6]
     w = act[ids["ctrl_num"] + 6 : ids["ctrl_num"] + ids["eef_num"] + 6]
-    des_pos_pd = act[ids["ctrl_num"] + ids["eef_num"] + 6 : ids["ctrl_num"] * 2 + ids["eef_num"] + 6]
     logits = {
         "des_pos": des_pos,
         "des_com_vel": des_com_vel,
         "des_com_angvel": des_com_angvel,
         "w": w,
-        "des_pos_pd": des_pos_pd,
     }
     return logits
 
@@ -285,14 +283,12 @@ def ctrl2components(act, ids):
     des_com_vel = logits["des_com_vel"] * 0.05
     des_com_vel_mag = jnp.clip(jnp.linalg.norm(des_com_vel), 0.0, 0.7)
     des_com_vel = des_com_vel * (des_com_vel_mag / (1e-6 + jnp.linalg.norm(des_com_vel)))
-    des_pos_pd = ids["default_qpos"][7:] + jnp.tanh(logits["des_pos_pd"]) * 1.0
     w = logits["w"]
     outputs = {
         "des_pos": des_pos,
         "des_com_vel": des_com_vel,
         "des_com_angvel": des_angvel,
         "w": w,
-        "des_pos_pd": des_pos_pd,
     }
     return outputs
 
@@ -327,7 +323,6 @@ def step(model, data, act, ids, is_mjx = False,
          debug = False, filt_state = None):
     output = ctrl2components(act, ids)
     des_pos = output["des_pos"]
-    des_pos_pd = output["des_pos_pd"]
     des_com_vel = output["des_com_vel"]
     des_angvel = output["des_com_angvel"]
     w = output["w"]
@@ -338,21 +333,22 @@ def step(model, data, act, ids, is_mjx = False,
     qpos = data.qpos[ids["joint_pos_ids"]][7:]
     qvel = data.qvel[ids["joint_vel_ids"]][6:]
 
-    pd_tau = p_weight * (des_pos_pd - qpos) + d_weight * (0.0 - qvel)
+    pd_tau = p_weight * (des_pos - qpos) + d_weight * (0.0 - qvel)
     
     qacc_c, com_accs, world_com_vel = highlvlPD(data, des_pos, des_com_vel, des_angvel, ids)
     m, h, jacs, jvp, jac_com, com_jvp, eefpos, com_pos = lmodel.get_kin_values(
         model, data, ids, is_mjx = is_mjx)
     a_stc = jnp.zeros(6 * ids["eef_num"])
     #s = jnp.where(nn.sigmoid(w) > 0.5, 1.0, 0.0)
+    qacc_c = jnp.zeros_like(qacc_c)
     u, f, q_ddot_com, norm_dict = maqp(m, h, w, a_stc,
                 eefpos, com_pos,
                 jacs, jvp,
                 jac_com, com_jvp,
                 com_accs,
                 qacc_c, ids, is_mjx = is_mjx, debug = debug)
-    u = jnp.nan_to_num(u, posinf = 0.0, neginf = 0.0, nan = 0.0)
-    u = u * 0.1 + pd_tau
+    u_ff = jnp.nan_to_num(u, posinf = 0.0, neginf = 0.0, nan = 0.0)
+    u = u_ff + pd_tau
 
     #u_final = u * (pd_weight) + pd_tau * (1.0 - pd_weight)
 
@@ -368,7 +364,7 @@ def step(model, data, act, ids, is_mjx = False,
     if debug:
         debug_info = {
             "pd_tau": pd_tau,
-            "u": u,
+            "u": u_ff,
             "u_final": u_final,
             "f": f,
             "q_ddot_com": q_ddot_com,
@@ -394,8 +390,8 @@ def default_act(ids):
     des_com_angvel = jnp.zeros([3])
     #w = jnp.ones([ids["eef_num"]]) * 4.0
     w = jnp.array([10., 10., -5., -5.])
-    des_pos_pd = jnp.zeros([ids["ctrl_num"]])
-    act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w, des_pos_pd], axis = 0)
+    #des_pos_pd = jnp.zeros([ids["ctrl_num"]])
+    act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w], axis = 0)
     return act
 
 def default_act_lock_com(com_pos, data, ids):
@@ -525,8 +521,8 @@ def raise_right_leg(com_pos, data, t, tmax, ids):
     des_com_angvel = jnp.zeros([3])
     #w = jnp.ones([ids["eef_num"]]) * 4.0
     w = jnp.array([10., -5., -5., -5.])
-    des_pos_pd = jnp.zeros([ids["ctrl_num"]])
-    act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w, des_pos_pd], axis = 0)
+    #des_pos_pd = jnp.zeros([ids["ctrl_num"]])
+    act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w], axis = 0)
     
     com_pos = com_pos + jnp.array([0.0, 0.05, 0.0])
     current_com = data.subtree_com[0]

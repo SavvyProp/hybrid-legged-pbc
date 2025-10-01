@@ -667,15 +667,15 @@ class Joystick(t1_base.T1Env):
 
     # maqp torque rate penalty
 
-    u_action_rate = jp.sum(jp.square(u - info["last_u_act"]))
-    u_action_rate *= -0.000005
-    u_action_rate = jp.clip(u_action_rate, -0.30, 0.0)
+    #u_action_rate = jp.sum(jp.square(u - info["last_u_act"]))
+    #u_action_rate *= -0.000005
+    #u_action_rate = jp.clip(u_action_rate, -0.30, 0.0)
     info["last_u_act"] = u
 
     total_rew = (torque_lim_rew * 0.30 + 
                  frc_rew * 0.10 + 
-                 foot_torque_rew * 0.30 +
-                 u_action_rate * 1.0)
+                 foot_torque_rew * 0.30)
+                 #u_action_rate * 1.0)
 
     rew = jp.nan_to_num(total_rew, nan=-1.0, posinf=-1.0, neginf=-1.0)
 
