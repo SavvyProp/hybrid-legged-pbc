@@ -37,25 +37,24 @@ from flax import linen as nn
 def phys_step(
     model: mjx.Model,
     data: mjx.Data,
-    filt_state,
     action: jax.Array,
     n_substeps: int = 1,
 ) -> tuple[mjx.Data, Any]:
   """Advance physics n_substeps times applying MAQP control each substep."""
   def single_step(carry, _):
-    data, filt = carry
-    ctrl, filt = maqp.step(model, data, action, bids.ids,
+    data = carry
+    ctrl = maqp.step(model, data, action, bids.ids,
                            is_mjx=True,
-                           filt_state=filt)
+                           filt_state=None)
     data = data.replace(ctrl=ctrl)
     data = mjx.step(model, data)
-    return (data, filt), None
+    return data, None
 
-  (data, filt_state), _ = jax.lax.scan(single_step,
-                                       (data, filt_state),
+  data, _ = jax.lax.scan(single_step,
+                                       data,
                                        None,
                                        length=n_substeps)
-  return data, filt_state
+  return data
 
 def default_config() -> config_dict.ConfigDict:
   return config_dict.create(
@@ -110,7 +109,6 @@ def default_config() -> config_dict.ConfigDict:
               feet_distance=-1.0,
               collision=-1.0,
               pbc_w=-1.0,
-              qc_weight=-0.50,
               maqp_cons=0.50,
               vel_def=1.0,
               vel_action_rate = -0.001
@@ -362,10 +360,9 @@ class Joystick(t1_base.T1Env):
     # state = self._reset_if_outside_bounds(state)
 
     motor_targets = action #self._default_pose + action * self._config.action_scale
-    data, filt_state = phys_step(
-        self.mjx_model, state.data, state.info["filt_state"], motor_targets, self.n_substeps
+    data = phys_step(
+        self.mjx_model, state.data, motor_targets, self.n_substeps
     )
-    state.info["filt_state"] = filt_state
 
     state.info["motor_targets"] = motor_targets
 
@@ -596,7 +593,6 @@ class Joystick(t1_base.T1Env):
         "pose": self._cost_pose(data.qpos[7:]),
         "feet_distance": self._cost_feet_distance(data, info),
         "pbc_w": self._cost_pbc_w(action, contact),
-        "qc_weight": self._reward_weight_logit_weight(action, contact),
         "maqp_cons": self._reward_maqp_cons(data, info, action),
         "vel_def": self._reward_des_vel(action, info["command"]),
         "vel_action_rate": self._cost_vel_action_rate(action, info["last_act"]),
@@ -686,21 +682,6 @@ class Joystick(t1_base.T1Env):
     return rew
   
   # Tracking rewards.
-  def _reward_weight_logit_weight(self, action, contact):
-    logits = ctrl2logits(action, self.ids)
-
-    ref = jp.ones(self.ids["ctrl_num"])
-    left_contact_mask = jp.zeros(self.ids["ctrl_num"])
-    left_contact_mask = left_contact_mask.at[11:17].set(1.0)
-    right_contact_mask = jp.zeros(self.ids["ctrl_num"])
-    right_contact_mask = right_contact_mask.at[17:23].set(1.0)
-    mask = contact[0] * left_contact_mask + contact[1] * right_contact_mask
-
-    ref = ref * (1.0 - mask)
-
-    rew = jp.mean(jp.square(logits["qc_weight"] - ref))
-
-    return rew
 
   def _cost_pbc_w(self, action, contact):
     logits = ctrl2logits(action, bids.ids)
