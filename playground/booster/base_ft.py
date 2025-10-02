@@ -26,7 +26,7 @@ from mujoco_playground._src import mjx_env
 from mujoco_playground._src.locomotion.t1 import t1_constants as consts
 
 from models.booster_t1_pgnd import booster_ids as bids
-from lowctrl import maqp
+from lowctrl import ft_ref
 
 def make_data(
     model: mujoco.MjModel,
@@ -126,7 +126,7 @@ class T1Env(mjx_env.MjxEnv):
 
   @property
   def action_size(self) -> int:
-    return maqp.default_act(self.ids).shape[0]
+    return ft_ref.default_act(self.ids).shape[0]
 
   @property
   def mj_model(self) -> mujoco.MjModel:

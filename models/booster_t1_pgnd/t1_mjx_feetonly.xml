@@ -57,7 +57,7 @@
 
       <default class="head">
         <joint actuatorfrcrange="-7 7" damping="2"/>
-        <position kp="20"/>
+        
         <default class="head_yaw">
           <joint axis="0 0 1" range="-1.57 1.57"/>
         </default>
@@ -67,7 +67,7 @@
       </default>
       <default class="shoulder">
         <joint actuatorfrcrange="-18 18" damping="2"/>
-        <position kp="20"/>
+        
         <default class="shoulder_pitch">
           <joint axis="0 1 0" range="-3.31 1.22"/>
         </default>
@@ -77,7 +77,7 @@
       </default>
       <default class="elbow">
         <joint actuatorfrcrange="-18 18" damping="2"/>
-        <position kp="20"/>
+        
         <default class="elbow_pitch">
           <joint axis="0 1 0" range="-2.27 2.27"/>
         </default>
@@ -87,28 +87,27 @@
       </default>
       <default class="waist">
         <joint axis="0 0 1" range="-1.57 1.57" actuatorfrcrange="-30 30" damping="3"/>
-        <position kp="50"/>
+        
       </default>
       <default class="hip">
         <default class="hip_pitch">
           <joint axis="0 1 0" range="-1.8 1.57" actuatorfrcrange="-45 45" damping="3"/>
-          <position kp="30"/>
+          
         </default>
         <default class="hip_roll">
           <joint axis="1 0 0" actuatorfrcrange="-30 30" damping="3"/>
-          <position kp="30"/>
+          
         </default>
         <default class="hip_yaw">
           <joint axis="0 0 1" range="-1 1" actuatorfrcrange="-30 30" damping="3"/>
-          <position kp="30"/>
+          
         </default>
       </default>
       <default class="knee">
         <joint axis="0 1 0" range="0 2.34" actuatorfrcrange="-60 60" damping="3"/>
-        <position kp="30"/>
+        
       </default>
       <default class="ankle">
-        <position kp="10"/>
         <joint damping="3"/>
         <default class="ankle_pitch">
           <joint axis="0 1 0" range="-0.87 0.35" actuatorfrcrange="-20 20"/>

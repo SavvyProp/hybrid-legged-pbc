@@ -8,7 +8,7 @@ import mujoco.viewer
 import jax.numpy as jnp
 from brax.training.acme import running_statistics
 #from playground.booster import joystick
-from playground.booster import joystick_maqp as joystick
+from playground.booster import joystick_ft as joystick
 from playground.booster.config import ppo_params
 from models.booster_t1_pgnd.booster_ids import ids
 from rewards.mjx_col import get_forces

@@ -27,10 +27,10 @@ from mujoco_playground._src import gait
 from mujoco_playground._src import mjx_env
 #from mujoco_playground._src.locomotion.t1 import base as t1_base
 from mujoco_playground._src.locomotion.t1 import t1_constants as consts
-from playground.booster import base_maqp as t1_base
+from playground.booster import base_ft as t1_base
 from rewards import rewards
-from lowctrl.maqp import ctrl2logits, default_act
-from lowctrl import maqp
+from lowctrl.ft_ref import ctrl2logits, default_act
+from lowctrl import ft_ref
 from rewards.mjx_col import get_contacts, get_forces
 from flax import linen as nn
 
@@ -44,7 +44,7 @@ def phys_step(
   """Advance physics n_substeps times applying MAQP control each substep."""
   def single_step(carry, _):
     data, filt = carry
-    ctrl, filt = maqp.step(model, data, action, bids.ids,
+    ctrl, filt = ft_ref.step(model, data, action, bids.ids,
                            is_mjx=True,
                            filt_state=filt)
     data = data.replace(ctrl=ctrl)
@@ -112,7 +112,8 @@ def default_config() -> config_dict.ConfigDict:
               pbc_w=-1.0,
               maqp_cons=0.50,
               vel_def=1.0,
-              vel_action_rate = -0.001
+              vel_action_rate = -0.001,
+              frc = 0.10
           ),
           tracking_sigma=0.25,
           max_foot_height=0.12,
@@ -314,7 +315,7 @@ class Joystick(t1_base.T1Env):
         "push_interval_steps": push_interval_steps,
         "filtered_linvel": jp.zeros(3),
         "filtered_angvel": jp.zeros(3),
-        "filt_state": maqp.make_filt_state(self.ids)
+        "filt_state": ft_ref.make_filt_state(self.ids)
     }
 
     metrics = {}
@@ -546,6 +547,7 @@ class Joystick(t1_base.T1Env):
       contact: jax.Array,
   ) -> dict[str, jax.Array]:
     del metrics  # Unused.
+    components = ft_ref.ctrl2components(data, action, self.ids)
     return {
         # Tracking rewards.
         "tracking_lin_vel": self._reward_tracking_lin_vel(
@@ -597,9 +599,25 @@ class Joystick(t1_base.T1Env):
         "feet_distance": self._cost_feet_distance(data, info),
         "pbc_w": self._cost_pbc_w(action, contact),
         "maqp_cons": self._reward_maqp_cons(data, info, action),
-        "vel_def": self._reward_des_vel(action, info["command"]),
+        "vel_def": self._reward_des_vel(components, info["command"]),
         "vel_action_rate": self._cost_vel_action_rate(action, info["last_act"]),
+        "frc": self._rew_frc(components, data),
     }
+  
+  def _rew_frc(self, components, data):
+    l_true, r_true = get_forces(data, self.ids)
+    lf = components["frc"][0, :]
+    rf = components["frc"][1, :]
+    lh = components["frc"][2, :]
+    rh = components["frc"][3, :]
+    fac = 20000
+    left_frc_error = jp.sum(jp.square(lf - l_true)) / fac
+    right_frc_error = jp.sum(jp.square(rf - r_true)) / fac
+    left_hand_error = jp.sum(jp.square(lh)) / fac
+    right_hand_error = jp.sum(jp.square(rh)) / fac
+    frc_error = left_frc_error + right_frc_error + left_hand_error + right_hand_error
+    frc_rew = jp.exp(-frc_error)
+    return frc_rew
   
   def _cost_vel_action_rate(
       self, act: jax.Array, last_act: jax.Array
@@ -608,14 +626,15 @@ class Joystick(t1_base.T1Env):
     angvel_act = ctrl2logits(act, self.ids)["des_com_angvel"]
     vel_last_act = ctrl2logits(last_act, self.ids)["des_com_vel"]
     angvel_last_act = ctrl2logits(last_act, self.ids)["des_com_angvel"]
+    frc_act = ctrl2logits(act, self.ids)["frc"]
+
     c1 = jp.sum(jp.square(vel_act - 
                           vel_last_act))
     c2 = jp.sum(jp.square(angvel_act - 
                           angvel_last_act))
     return c1 + c2
   
-  def _reward_des_vel(self, action, lin_vel):
-    components = maqp.ctrl2components(action, self.ids)
+  def _reward_des_vel(self, components, lin_vel):
     des_vel_mag = jp.linalg.norm(components["des_com_vel"])
     des_angvel_mag = jp.linalg.norm(components["des_com_angvel"])
     des_vel_cap = 0.7
@@ -634,7 +653,7 @@ class Joystick(t1_base.T1Env):
     return rew_vel_lim * 0.1 + linvel_rew
   
   def _reward_maqp_cons(self, data, info, action):
-    debug_dict = maqp.step(self._mjx_model, 
+    debug_dict = ft_ref.step(self._mjx_model, 
                            data, action, self.ids, 
                            is_mjx=True, debug=True)
     f = debug_dict["f"]
@@ -688,7 +707,6 @@ class Joystick(t1_base.T1Env):
 
   def _cost_pbc_w(self, action, contact):
     logits = ctrl2logits(action, bids.ids)
-
     return rewards.reward_pbc_w_leg_only(logits["w"], contact)
 
   def _reward_tracking_lin_vel(

@@ -2,8 +2,8 @@ import mujoco
 import mujoco.viewer
 from mujoco import mjx
 import jax.numpy as jnp
-from lowctrl.maqp import default_act
-from lowctrl import maqp
+from lowctrl.ft_ref import default_act
+from lowctrl import ft_ref
 from models.booster_t1_pgnd import booster_ids as bids
 import jax
 
@@ -26,8 +26,8 @@ t = 0
 @jax.jit
 def step_fn(mjx_model, mjx_state, init_com, t):
     #act = default_act(bids.ids)
-    act = maqp.test_act_move_com(init_com, mjx_state, t, bids.ids)
-    output = maqp.step(mjx_model, mjx_state, act, bids.ids, is_mjx = True, debug=True)
+    act = ft_ref.default_act_lock_com(init_com, mjx_state, bids.ids)
+    output = ft_ref.step(mjx_model, mjx_state, act, bids.ids, is_mjx = True, debug=True)
     data = mjx_state.replace(ctrl=output["u"])
     data = mjx.step(mjx_model, data)
     return data, output
