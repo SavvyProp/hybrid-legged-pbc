@@ -267,17 +267,9 @@ def main():
     real_pos = load_matrix(os.path.join('data', 'real_pos.csv'))
     des_pos = load_matrix(os.path.join('data', 'des_pos.csv'))
 
-    q_ddot_uc = load_matrix(os.path.join('data', 'q_ddot_uc.csv'))
-    qacc_c = load_matrix(os.path.join('data', 'qacc_c.csv'))
-
-    qc_weight = load_matrix(os.path.join('data', 'qc_weight.csv'))
-
-    norm_big_q = load_matrix(os.path.join('data', 'norm_big_q.csv'))
-    norm_small_q = load_matrix(os.path.join('data', 'norm_small_q.csv'))
-
-    qp_errors = load_matrix(os.path.join('data', 'qp_errors.csv'))
-
     u_final = load_matrix(os.path.join('data', 'u_final.csv'))
+
+    f_ref = load_matrix(os.path.join('data', 'f_ref.csv'))
 
     range_lower = 300
     range_upper = 500
@@ -343,6 +335,8 @@ def main():
 
     # New: plot for f[:, 0:12]
     plot_f_first12(f[range_lower:range_upper, :], save_path=os.path.join('data', 'f_first12.png'))
+
+    plot_f_first12(f_ref[range_lower:range_upper, :], save_path=os.path.join('data', 'f_ref_first12.png'), suptitle="f_ref[:, 0:12] over time")
 
     # New: plot for q_ddot_com vs com_ref
     plot_qddot_com_vs_ref(q_ddot_com[range_lower:range_upper, :], 

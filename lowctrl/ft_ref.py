@@ -269,6 +269,7 @@ def step(model, data, act, ids, is_mjx = False,
             "real_angvel": data.qvel[3:6],
             "qp_errors": norm_dict["errors"],
             "des_pos": des_pos,
+            "f_ref": f_ref.reshape(-1),
         }
         if filt_state is not None:
             debug_info["u_filt"] = u_filt

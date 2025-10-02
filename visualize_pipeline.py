@@ -58,7 +58,7 @@ def debug_eefpbc(state, prev_info, act, i):
     #print("u_change:", jnp.sum(jnp.square(current_u - prev_u)))
     #print("logits qp_weight:", logits["qc_weight"])
 
-dir = "training/ft_1"
+dir = "training/ft_2"
 
 model_path = dir + "/walk_policy"
 saved_params = model.load_params(model_path)
