@@ -341,14 +341,6 @@ def main():
                              suptitle='des_pos & real_pos cols 11–16',
                              save_path=os.path.join('data', 'des_pos_vs_real_pos.png'))
 
-    plot_cols_11_16_overlaid(q_ddot_uc[range_lower:range_upper, :], 
-                             qacc_c[range_lower:range_upper, :], 
-                             legend=['q_ddot_uc', 'qacc_c'],
-                             ylabel='joint acceleration (rad/s^2)',
-                             suptitle='q_ddot_uc & qacc_c cols 11–16',
-                             idxs=np.arange(11 + 6, 17 + 6),
-                             save_path=os.path.join('data', 'q_ddot_uc_vs_qacc_c.png'))
-
     # New: plot for f[:, 0:12]
     plot_f_first12(f[range_lower:range_upper, :], save_path=os.path.join('data', 'f_first12.png'))
 
@@ -356,19 +348,9 @@ def main():
     plot_qddot_com_vs_ref(q_ddot_com[range_lower:range_upper, :], 
                           com_ref[range_lower:range_upper, :], save_path=os.path.join('data', 'q_ddot_com_vs_com_ref.png'))
 
-    # New: plot for qc_weight cols 11..16
-    plot_qc_weight_cols_11_16(qc_weight[range_lower:range_upper, :], save_path=os.path.join('data', 'qc_weight_cols_11_16.png'))
-
-    # New: plot for norm_big_q and norm_small_q
-    plot_norms(norm_big_q[range_lower:range_upper, :], 
-               norm_small_q[range_lower:range_upper, :], 
-               names=["cent acc", "cent cons", "f mag", "q_ddot_c", "qu mag", "eef accs", "u pd"],
-               save_path=os.path.join('data', 'norms.png'))
+    
 
     # New: plot for qp_errors
-    plot_qp_errors(qp_errors[range_lower:range_upper, :], 
-                   names=["cent acc", "cent cons", "f mag", "q_ddot_c", "qu mag", "eef accs", "u pd"],
-                   save_path=os.path.join('data', 'qp_errors.png'))
 
     plt.show()
 

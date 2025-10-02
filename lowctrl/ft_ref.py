@@ -240,6 +240,7 @@ def step(model, data, act, ids, is_mjx = False,
         eefpos, com_pos, jacs, f_ref, com_accs, w, ids, debug
     )
     u_ff = jnp.nan_to_num(u_ff, posinf = 0.0, neginf = 0.0, nan = 0.0)
+    u_ff = jnp.clip(u_ff, -ids["tau_limits"] * 0.5, ids["tau_limits"] * 0.5)
     u = u_ff + pd_tau
 
     #u_final = u * (pd_weight) + pd_tau * (1.0 - pd_weight)

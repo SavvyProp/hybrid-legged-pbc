@@ -12,7 +12,7 @@ from playground.booster import joystick_ft as joystick
 from playground.booster.config import ppo_params
 from models.booster_t1_pgnd.booster_ids import ids
 from rewards.mjx_col import get_forces
-from lowctrl import maqp
+from lowctrl import ft_ref
 
 env = joystick.Joystick()
 
@@ -20,8 +20,8 @@ jit_reset = jax.jit(env.reset)
 jit_step = jax.jit(env.step)
 # JIT maqp.step by closing over non-array args (model, ids, flags)
 @jax.jit
-def jit_maqp_step(mjx_state, act):
-    return maqp.step(env._mjx_model, mjx_state, act, ids, is_mjx=True, debug=True)
+def jit_ft_step(mjx_state, act):
+    return ft_ref.step(env._mjx_model, mjx_state, act, ids, is_mjx=True, debug=True)
 state = jit_reset(jax.random.PRNGKey(0))
 
 def makeIFN():
@@ -47,8 +47,7 @@ import numpy as np
 array_dict = {}
 
 def debug_eefpbc(state, prev_info, act, i):
-    logits = maqp.ctrl2logits(act, ids)
-    debug_dict = jit_maqp_step(state, act)
+    debug_dict = jit_ft_step(state, act)
     for key in debug_dict:
         if key not in array_dict:
             array_dict[key] = np.zeros([1000] + list(debug_dict[key].shape))
@@ -59,7 +58,7 @@ def debug_eefpbc(state, prev_info, act, i):
     #print("u_change:", jnp.sum(jnp.square(current_u - prev_u)))
     #print("logits qp_weight:", logits["qc_weight"])
 
-dir = "training/maqpt_filt"
+dir = "training/ft_1"
 
 model_path = dir + "/walk_policy"
 saved_params = model.load_params(model_path)
