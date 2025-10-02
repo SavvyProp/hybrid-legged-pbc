@@ -133,6 +133,12 @@ dummy_joints = [
     0, 1
 ]
 
+mass = 31.614357
+angular_inertia = jnp.array(
+    [[ 2.77498525e+00,  5.36123413e-04,  2.12637797e-01]
+ [ 5.36123413e-04,  2.64427940e+00, -2.98730940e-03]
+ [ 2.12637797e-01, -2.98730940e-03,  4.91490757e-01]])
+
 ids = {
     "joint_pos_ids": joint_pos_ids,
     "joint_vel_ids": joint_vel_ids,
@@ -151,5 +157,7 @@ ids = {
         "right_foot": right_col,
         "floor": floor_col
     },
-    "dummy_joints": dummy_joints
+    "dummy_joints": dummy_joints,
+    "mass": mass,
+    "angular_inertia": angular_inertia
 }
