@@ -356,15 +356,16 @@ def step(model, data, act, ids, is_mjx = False,
 
     if filt_state is not None:
         alpha = 0.95
-        u_filt = alpha * filt_state["prev_u"] + (1 - alpha) * u
+        u_filt = alpha * filt_state["prev_u"] + (1 - alpha) * u_ff
         filt_state["prev_u"] = u_filt
-        u_final = jnp.clip(u_filt, -tau_limits, tau_limits)
+        u_final = jnp.clip(u_filt + pd_tau, -tau_limits, tau_limits)
     else:
         u_final = jnp.clip(u, -tau_limits, tau_limits)
     if debug:
         debug_info = {
             "pd_tau": pd_tau,
             "u": u_ff,
+            "u_pd": pd_tau,
             "u_final": u_final,
             "f": f,
             "q_ddot_com": q_ddot_com,

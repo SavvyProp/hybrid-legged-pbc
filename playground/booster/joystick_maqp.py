@@ -37,24 +37,25 @@ from flax import linen as nn
 def phys_step(
     model: mjx.Model,
     data: mjx.Data,
+    filt_state,
     action: jax.Array,
     n_substeps: int = 1,
 ) -> tuple[mjx.Data, Any]:
   """Advance physics n_substeps times applying MAQP control each substep."""
   def single_step(carry, _):
-    data = carry
-    ctrl = maqp.step(model, data, action, bids.ids,
+    data, filt = carry
+    ctrl, filt = maqp.step(model, data, action, bids.ids,
                            is_mjx=True,
-                           filt_state=None)
+                           filt_state=filt)
     data = data.replace(ctrl=ctrl)
     data = mjx.step(model, data)
-    return data, None
+    return (data, filt), None
 
-  data, _ = jax.lax.scan(single_step,
-                                       data,
+  (data, filt_state), _ = jax.lax.scan(single_step,
+                                       (data, filt_state),
                                        None,
                                        length=n_substeps)
-  return data
+  return data, filt_state
 
 def default_config() -> config_dict.ConfigDict:
   return config_dict.create(
@@ -360,9 +361,11 @@ class Joystick(t1_base.T1Env):
     # state = self._reset_if_outside_bounds(state)
 
     motor_targets = action #self._default_pose + action * self._config.action_scale
-    data = phys_step(
-        self.mjx_model, state.data, motor_targets, self.n_substeps
+    data, filt_state = phys_step(
+        self.mjx_model, state.data, state.info["filt_state"], motor_targets, self.n_substeps
     )
+
+    state.info["filt_state"] = filt_state
 
     state.info["motor_targets"] = motor_targets
 
