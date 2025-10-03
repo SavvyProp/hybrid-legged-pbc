@@ -90,8 +90,8 @@ def default_config() -> config_dict.ConfigDict:
               torques=0.0,
               action_rate=-0.002,
               energy=0.0,
-              dof_acc=-2e-7,
-              dof_vel=-2e-5,
+              dof_acc=-1e-6,
+              dof_vel=-1e-4,
               # Feet related rewards.
               feet_clearance=0.0,
               feet_air_time=2.0,
