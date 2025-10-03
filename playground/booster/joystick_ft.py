@@ -113,7 +113,7 @@ def default_config() -> config_dict.ConfigDict:
               maqp_cons=0.50,
               vel_def=1.0,
               vel_action_rate = -0.001,
-              frc = 0.10
+              frc = 0.10,
               pd_weight = -0.20
           ),
           tracking_sigma=0.25,
