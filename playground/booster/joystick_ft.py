@@ -91,7 +91,7 @@ def default_config() -> config_dict.ConfigDict:
               action_rate=-0.001,
               energy=0.0,
               dof_acc=-1e-7,
-              dof_vel=-2e3,
+              dof_vel=-1e-5,
               # Feet related rewards.
               feet_clearance=0.0,
               feet_air_time=2.0,
