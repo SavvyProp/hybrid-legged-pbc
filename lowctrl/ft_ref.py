@@ -74,7 +74,7 @@ def eval_qp(big_q, small_q, x):
 def ft_ref(eefpos, com_pos, 
          jacs, f_ref, com_ref, w, ids, debug,
          barrier = True):
-    weights = jnp.array([1e1, 1e-5, 1e-4, 1e-4])
+    weights = jnp.array([1e1, 1e-5, 1e-4, 1e-5])
     mat_height = 6 + 6 * ids["eef_num"]
     F_size = ids["eef_num"] * 6
     select = {
@@ -213,7 +213,7 @@ def highlvlPD(data, des_com_vel, des_angvel, ids):
     c_lin_p_gain = 5.0
     com_acc = c_lin_p_gain * (world_com_vel - qvel[0:3])
     
-    c_ang_p_gain = 4.0
+    c_ang_p_gain = 0.25
     com_angacc = c_ang_p_gain * (des_angvel - qvel[3:6])
 
     com_accs = jnp.concatenate([com_acc, com_angacc], axis = 0)
