@@ -637,7 +637,7 @@ class Joystick(t1_base.T1Env):
   def _reward_des_vel(self, components, lin_vel):
     des_vel_mag = jp.linalg.norm(components["des_com_vel"])
     des_angvel_mag = jp.linalg.norm(components["des_com_angvel"])
-    des_vel_cap = 0.7
+    des_vel_cap = 1.5
     des_angvel_cap = 3.0
     des_vel_rew = jp.clip(des_vel_mag - des_vel_cap,
                            min = 0.0, max = None)

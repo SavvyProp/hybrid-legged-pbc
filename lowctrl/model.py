@@ -114,4 +114,6 @@ def jac_only_kin_values(model, data, ids, is_mjx = True):
     j_stack = jac_stack(model, data, ids, is_mjx = is_mjx)
     eef_pos = get_eefpos(data, ids)
     com_pos = get_compos(data)
-    return j_stack, eef_pos, com_pos
+    vel_ids = ids["joint_vel_ids"]
+    h = data.qfrc_bias[vel_ids]
+    return j_stack, eef_pos, com_pos, h

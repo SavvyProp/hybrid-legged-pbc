@@ -30,7 +30,7 @@ def f_mag_q(w, ids):
     logits = -jnp.clip(w, -6.0, 6.0)
     big_qp = lmath.vec2diags(jnp.exp(logits), ids)
     big_qp += jnp.eye(6 * ids["eef_num"]) * 1
-    tau_cost = lmath.torqueCost(20.0, ids)
+    tau_cost = lmath.torqueCost(40.0, ids)
     big_qp = tau_cost @ big_qp 
     return big_qp, jnp.zeros(6 * ids["eef_num"])
 
@@ -177,11 +177,11 @@ def ctrl2components(data, act, ids):
     des_pos = ids["default_qpos"][7:] + jnp.tanh(logits["des_pos"]) * 1.0
     #des_angvel = jnp.tanh(logits["des_com_angvel"]) * 1.0
     des_angvel = logits["des_com_angvel"] * 0.20
-    des_angvel_mag = jnp.clip(jnp.linalg.norm(des_angvel), 0.0, 3.0)
+    des_angvel_mag = jnp.clip(jnp.linalg.norm(des_angvel), 0.0, 4.0)
     des_angvel = des_angvel * (des_angvel_mag / (1e-6 + jnp.linalg.norm(des_angvel)))
     #des_com_vel = jnp.tanh(logits["des_com_vel"]) * 0.7
     des_com_vel = logits["des_com_vel"] * 0.05
-    des_com_vel_mag = jnp.clip(jnp.linalg.norm(des_com_vel), 0.0, 0.7)
+    des_com_vel_mag = jnp.clip(jnp.linalg.norm(des_com_vel), 0.0, 2.0)
     des_com_vel = des_com_vel * (des_com_vel_mag / (1e-6 + jnp.linalg.norm(des_com_vel)))
     w = logits["w"]
 
@@ -237,14 +237,18 @@ def step(model, data, act, ids, is_mjx = False,
 
     pd_tau = p_weight * (des_pos - qpos)
     com_accs, world_com_vel = highlvlPD(data, des_com_vel, des_angvel, ids)
-    jacs, eefpos, com_pos = lmodel.jac_only_kin_values(model, data, ids, is_mjx = is_mjx)
+    jacs, eefpos, com_pos, h = lmodel.jac_only_kin_values(model, data, ids, is_mjx = is_mjx)
     
     #s = jnp.where(nn.sigmoid(w) > 0.5, 1.0, 0.0)
     u_ff, f, q_ddot_com, norm_dict = ft_ref(
         eefpos, com_pos, jacs, f_ref, com_accs, w, ids, debug, barrier = True
     )
+
+    nle_ff = h[6:]
+
     u_ff = jnp.nan_to_num(u_ff, posinf = 0.0, neginf = 0.0, nan = 0.0)
     u_ff = jnp.clip(u_ff, -ids["tau_limits"] * 1.0, ids["tau_limits"] * 1.0)
+    u_ff = u_ff + nle_ff
     u = u_ff + pd_tau
 
     #u_final = u * (pd_weight) + pd_tau * (1.0 - pd_weight)
