@@ -3,6 +3,8 @@ import jax
 import jax.scipy as jsp
 from lowctrl import math as lmath
 from lowctrl import model as lmodel
+from lowctrl.qp_solve import schur_solve
+from lowctrl import qp_solve
 from flax import linen as nn
 
 def make_centroidal_a(eefpos, com_pos, ids):
@@ -49,6 +51,12 @@ def centroidal_acc_q(q_ddot_com_ref):
     small_q = big_c.T @ q_ddot_com_ref
     return big_q, small_q
 
+def joint_torque_q(jacs):
+    mat = -jacs[:, 6:].T
+    big_q = mat.T @ mat
+    small_q = jnp.zeros(mat.shape[1])
+    return big_q, small_q
+
 # Constraints
 
 def centroidal_qacc_cons(select, big_a):
@@ -59,26 +67,14 @@ def centroidal_qacc_cons(select, big_a):
 
 # QP Solver
 
-def schur_solve(qp_q, qp_c, cons_lhs, cons_rhs):
-    Q = 0.5 * (qp_q + qp_q.T)
-    A = cons_lhs
-    c = qp_c
-    b = cons_rhs
-    Z = jnp.zeros((A.shape[0], A.shape[0]), dtype=jnp.float32)
-    KKT = jnp.block([[Q, A.T],
-                     [A, Z]])
-    rhs = jnp.concatenate([c, b], axis=0)
-    sol_all = jnp.linalg.solve(KKT, rhs)
-    sol = sol_all[:Q.shape[0]]
-    return sol
-
 def eval_qp(big_q, small_q, x):
     res = 0.5 * x.T @ big_q @ x - small_q.T @ x
     return res
 
 def ft_ref(eefpos, com_pos, 
-         jacs, f_ref, com_ref, w, ids, debug):
-    weights = jnp.array([1e1, 1e-5, 1e-4])
+         jacs, f_ref, com_ref, w, ids, debug,
+         barrier = True):
+    weights = jnp.array([1e1, 1e-5, 1e-4, 1e-3])
     mat_height = 6 + 6 * ids["eef_num"]
     F_size = ids["eef_num"] * 6
     select = {
@@ -115,6 +111,13 @@ def ft_ref(eefpos, com_pos,
     qp_q = qp_q.at[6:, 6:].add(big_q_ref)
     qp_c = qp_c.at[6:].add(small_c_ref)
 
+    big_q_tau, small_c_tau = joint_torque_q(jacs)
+    big_q_tau *= weights[3]
+    small_c_tau *= weights[3]
+
+    qp_q = qp_q.at[6:, 6:].add(big_q_tau)
+    qp_c = qp_c.at[6:].add(small_c_tau)
+
     # Make Cons
 
     cons_lhs_list = []
@@ -140,8 +143,9 @@ def ft_ref(eefpos, com_pos,
         cent_err = eval_qp(big_q_centroid, small_c_centroid, q_ddot_com)
         mag_err = eval_qp(big_q_mag, small_c_mag, f)
         ref_err = eval_qp(big_q_ref, small_c_ref, f)
+        tau_err = eval_qp(big_q_tau, small_c_tau, f)
         debug_dict = {
-            "errors": jnp.array([cent_err, mag_err, ref_err])
+            "errors": jnp.array([cent_err, mag_err, ref_err, tau_err])
         }
     return tau, f, q_ddot_com, debug_dict
 
@@ -237,10 +241,10 @@ def step(model, data, act, ids, is_mjx = False,
     
     #s = jnp.where(nn.sigmoid(w) > 0.5, 1.0, 0.0)
     u_ff, f, q_ddot_com, norm_dict = ft_ref(
-        eefpos, com_pos, jacs, f_ref, com_accs, w, ids, debug
+        eefpos, com_pos, jacs, f_ref, com_accs, w, ids, debug, barrier = True
     )
     u_ff = jnp.nan_to_num(u_ff, posinf = 0.0, neginf = 0.0, nan = 0.0)
-    u_ff = jnp.clip(u_ff, -ids["tau_limits"] * 0.5, ids["tau_limits"] * 0.5)
+    u_ff = jnp.clip(u_ff, -ids["tau_limits"] * 1.0, ids["tau_limits"] * 1.0)
     u = u_ff + pd_tau
 
     #u_final = u * (pd_weight) + pd_tau * (1.0 - pd_weight)
@@ -248,7 +252,7 @@ def step(model, data, act, ids, is_mjx = False,
     tau_limits = ids["tau_limits"]
 
     if filt_state is not None:
-        alpha = 0.95
+        alpha = 0.7
         u_filt = alpha * filt_state["prev_u"] + (1 - alpha) * u_ff
         filt_state["prev_u"] = u_filt
         u_final = jnp.clip(u_filt + pd_tau, -tau_limits, tau_limits)
