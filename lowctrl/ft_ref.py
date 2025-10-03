@@ -74,7 +74,7 @@ def eval_qp(big_q, small_q, x):
 def ft_ref(eefpos, com_pos, 
          jacs, f_ref, com_ref, w, ids, debug,
          barrier = True):
-    weights = jnp.array([1e1, 1e-5, 1e-4, 1e-3])
+    weights = jnp.array([1e1, 1e-5, 1e-4, 1e-4])
     mat_height = 6 + 6 * ids["eef_num"]
     F_size = ids["eef_num"] * 6
     select = {
