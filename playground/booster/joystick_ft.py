@@ -90,8 +90,8 @@ def default_config() -> config_dict.ConfigDict:
               torques=0.0,
               action_rate=-0.002,
               energy=0.0,
-              dof_acc=-1e-6,
-              dof_vel=-1e-4,
+              dof_acc=-5e-7,
+              dof_vel=-5e-5,
               # Feet related rewards.
               feet_clearance=0.0,
               feet_air_time=2.0,
@@ -114,6 +114,7 @@ def default_config() -> config_dict.ConfigDict:
               vel_def=1.0,
               vel_action_rate = -0.001,
               frc = 0.10
+              pd_weight = -0.20
           ),
           tracking_sigma=0.25,
           max_foot_height=0.12,
@@ -602,8 +603,14 @@ class Joystick(t1_base.T1Env):
         "vel_def": self._reward_des_vel(components, info["command"]),
         "vel_action_rate": self._cost_vel_action_rate(action, info["last_act"]),
         "frc": self._rew_frc(components, data),
+        "pd_weight": self._cost_pd_weight(components)
     }
   
+  def _cost_pd_weight(self, components):
+    pd_w = components["pd_weight"]
+    pd_w_cost = jp.mean(pd_w)
+    return pd_w_cost
+
   def _rew_frc(self, components, data):
     l_true, r_true = get_forces(data, self.ids)
     lf = components["frc"][0, :]
