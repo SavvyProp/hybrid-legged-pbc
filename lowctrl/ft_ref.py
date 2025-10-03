@@ -210,10 +210,10 @@ def highlvlPD(data, des_com_vel, des_angvel, ids):
 
     world_com_vel = lmath.rotate_des_com_vel(des_com_vel, data)
     
-    c_lin_p_gain = 5.0
+    c_lin_p_gain = 3.0
     com_acc = c_lin_p_gain * (world_com_vel - qvel[0:3])
     
-    c_ang_p_gain = 0.25
+    c_ang_p_gain = 0.10
     com_angacc = c_ang_p_gain * (des_angvel - qvel[3:6])
 
     com_accs = jnp.concatenate([com_acc, com_angacc], axis = 0)
