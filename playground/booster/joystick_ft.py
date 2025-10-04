@@ -293,6 +293,9 @@ class Joystick(t1_base.T1Env):
         maxval=self._config.push_config.interval_range[1],
     )
     push_interval_steps = jp.round(push_interval / self.dt).astype(jp.int32)
+    debug_dict = ft_ref.step(self._mjx_model, 
+                           data, ft_ref.default_act(self.ids), self.ids, 
+                           is_mjx=True, debug=True)
     info = {
         "rng": rng,
         "step": 0,
@@ -314,7 +317,8 @@ class Joystick(t1_base.T1Env):
         "push_interval_steps": push_interval_steps,
         "filtered_linvel": jp.zeros(3),
         "filtered_angvel": jp.zeros(3),
-        "filt_state": ft_ref.make_filt_state(self.ids)
+        "filt_state": ft_ref.make_filt_state(self.ids),
+        "ft_dict": debug_dict,
     }
 
     metrics = {}
@@ -406,6 +410,9 @@ class Joystick(t1_base.T1Env):
     }
     reward = jp.clip(sum(rewards.values()) * self.dt, 0.0, 10000.0)
 
+    state.info["ft_dict"] = ft_ref.step(self._mjx_model, 
+                           data, action, self.ids, 
+                           is_mjx=True, debug=True)
     state.info["push"] = push
     state.info["step"] += 1
     state.info["push_step"] += 1
@@ -506,6 +513,8 @@ class Joystick(t1_base.T1Env):
         noisy_joint_angles - self._default_pose,
         noisy_joint_vel,
         info["last_act"],
+        info["ft_dict"]["f"],
+        info["ft_dict"]["u"],
         phase,
     ])
 
@@ -635,9 +644,7 @@ class Joystick(t1_base.T1Env):
     return rew_vel_lim * 0.1 + linvel_rew
   
   def _reward_maqp_cons(self, data, info, action):
-    debug_dict = ft_ref.step(self._mjx_model, 
-                           data, action, self.ids, 
-                           is_mjx=True, debug=True)
+    debug_dict = info["ft_dict"]
     f = debug_dict["f"]
     l_true, r_true = get_forces(data, self.ids)
     #f = get_frc_pbc(self._mjx_model, data, action)

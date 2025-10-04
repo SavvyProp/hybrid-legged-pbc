@@ -75,7 +75,7 @@ def eval_qp(big_q, small_q, x):
 def ft_ref(eefpos, com_pos, 
          jacs, tau_ref, com_ref, w, ids, debug,
          barrier = True):
-    weights = jnp.array([1e-4, 3e-2])
+    weights = jnp.array([1e-4, 1e-2])
     F_size = ids["eef_num"] * 6
     select = {
         "F": jnp.eye(F_size),
@@ -249,7 +249,6 @@ def step(model, data, act, ids, is_mjx = False,
         debug_info = {
             "pd_tau": pd_tau,
             "u": u_ff,
-            "u_pd": pd_tau,
             "u_final": u_final,
             "f": f,
             "com_ref": com_accs,
