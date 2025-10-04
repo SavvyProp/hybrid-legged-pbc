@@ -58,7 +58,7 @@ def debug_eefpbc(state, prev_info, act, i):
     #print("u_change:", jnp.sum(jnp.square(current_u - prev_u)))
     #print("logits qp_weight:", logits["qc_weight"])
 
-dir = "training/t_2"
+dir = "training/t_4"
 
 model_path = dir + "/walk_policy"
 saved_params = model.load_params(model_path)
@@ -94,7 +94,6 @@ for c in range(1000):
     #nn_p, nn_d = raw_pd(raw_action)
     state = jit_step(state, ctrl)
     pipeline_state = state.data
-    print(state.metrics)
     print(state.done)
     #print(state.data.contact)
     #print(state.info["last_contact"])

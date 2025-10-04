@@ -27,9 +27,8 @@ def make_centroidal_a(eefpos, com_pos, ids):
 # Costs
 
 def f_mag_q(w, ids):
-    logits = -jnp.clip(w, -7.0, 7.0)
+    logits = -jnp.clip(w, -6.0, 6.0)
     big_qp = lmath.vec2diags(jnp.exp(logits), ids)
-    big_qp += jnp.eye(6 * ids["eef_num"]) * 0.1
     tau_cost = lmath.torqueCost(40.0, ids)
     big_qp = tau_cost @ big_qp 
     return big_qp, jnp.zeros(6 * ids["eef_num"])
@@ -75,7 +74,7 @@ def eval_qp(big_q, small_q, x):
 def ft_ref(eefpos, com_pos, 
          jacs, tau_ref, com_ref, w, ids, debug,
          barrier = True):
-    weights = jnp.array([1e-4, 1e-2])
+    weights = jnp.array([1e-3, 1e-2])
     F_size = ids["eef_num"] * 6
     select = {
         "F": jnp.eye(F_size),
