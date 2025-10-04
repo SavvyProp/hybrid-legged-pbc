@@ -162,15 +162,12 @@ def ctrl2logits(act, ids):
     w = act[ids["ctrl_num"] + 6 : ids["ctrl_num"] + ids["eef_num"] + 6]
     frc = act[ids["ctrl_num"] + ids["eef_num"] + 6:
               ids["ctrl_num"] + ids["eef_num"] * 4 + 6]
-    pd_weight = act[ids["ctrl_num"] + ids["eef_num"] * 4 + 6:
-                    ids["ctrl_num"] * 2 + ids["eef_num"] * 4 + 6]
     logits = {
         "des_pos": des_pos,
         "des_com_vel": des_com_vel,
         "des_com_angvel": des_com_angvel,
         "w": w,
-        "frc": frc,
-        "pd_weight": pd_weight
+        "frc": frc
     }
     return logits
 
@@ -204,8 +201,7 @@ def ctrl2components(data, act, ids):
         "des_com_vel": des_com_vel,
         "des_com_angvel": des_angvel,
         "w": w,
-        "frc": global_frc,
-        "pd_weight": nn.sigmoid(logits["pd_weight"]),
+        "frc": global_frc
     }
     return outputs
 
@@ -230,7 +226,6 @@ def step(model, data, act, ids, is_mjx = False,
     des_pos = output["des_pos"]
     des_com_vel = output["des_com_vel"]
     des_angvel = output["des_com_angvel"]
-    pd_weight = output["pd_weight"]
     w = output["w"]
     f_ref = output["frc"]
     
@@ -254,7 +249,7 @@ def step(model, data, act, ids, is_mjx = False,
     u_ff = jnp.nan_to_num(u_ff, posinf = 0.0, neginf = 0.0, nan = 0.0)
     u_ff = jnp.clip(u_ff, -ids["tau_limits"] * 1.0, ids["tau_limits"] * 1.0)
     u_ff = u_ff + nle_ff
-    u = u_ff + pd_tau * (pd_weight * 0.5 + 0.5)
+    u = u_ff + pd_tau
 
     #u_final = u * (pd_weight) + pd_tau * (1.0 - pd_weight)
 
@@ -304,8 +299,7 @@ def default_act(ids):
         0., 0., 0.,
         0., 0., 0.
     ]) / 0.40
-    pd_weight = jnp.ones([ids["ctrl_num"]])
-    act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w, frc, pd_weight], axis = 0)
+    act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w, frc], axis = 0)
     return act
 
 def default_act_lock_com(com_pos, data, ids):
@@ -396,9 +390,8 @@ def raise_right_leg(com_pos, data, t, tmax, ids):
         0., 0., 0.
     ]) / 0.40
 
-    pd_weight = jnp.ones([ids["ctrl_num"]])
 
-    act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w, frc, pd_weight], axis = 0)
+    act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w, frc], axis = 0)
     
     com_pos = com_pos + jnp.array([0.0, 0.05, 0.0])
     current_com = data.subtree_com[0]
