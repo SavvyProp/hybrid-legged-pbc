@@ -51,17 +51,18 @@ def centroidal_acc_q(q_ddot_com_ref):
     small_q = big_c.T @ q_ddot_com_ref
     return big_q, small_q
 
-def joint_torque_q(jacs):
+def joint_torque_q(jacs, tau_ref):
     mat = -jacs[:, 6:].T
     big_q = mat.T @ mat
-    small_q = jnp.zeros(mat.shape[1])
+    small_q = mat.T @ tau_ref
     return big_q, small_q
 
 # Constraints
 
-def centroidal_qacc_cons(select, big_a):
-    lhs = select["q_ddot_com"] - big_a @ select["F"]
-    rhs = jnp.array([0, 0, -9.81, 0, 0, 0])
+def centroidal_qacc_cons(select, big_a, g, com_ref):
+    # big_a @ F + g = com_ref
+    lhs = big_a @ select["F"]
+    rhs = com_ref - g
     return lhs, rhs
 
 
@@ -72,14 +73,12 @@ def eval_qp(big_q, small_q, x):
     return res
 
 def ft_ref(eefpos, com_pos, 
-         jacs, f_ref, com_ref, w, ids, debug,
+         jacs, tau_ref, com_ref, w, ids, debug,
          barrier = True):
-    weights = jnp.array([1e1, 1e-5, 1e-4, 1e-5])
-    mat_height = 6 + 6 * ids["eef_num"]
+    weights = jnp.array([1e-4, 1e-2])
     F_size = ids["eef_num"] * 6
     select = {
-        "q_ddot_com": jnp.block([jnp.eye(6), jnp.zeros((6, mat_height - 6))]),
-        "F": jnp.block([jnp.zeros([F_size, 6]), jnp.eye(F_size)]),
+        "F": jnp.eye(F_size),
     }
 
     a, g = make_centroidal_a(
@@ -88,42 +87,30 @@ def ft_ref(eefpos, com_pos,
                           ids
                           )
     
-    qp_q = jnp.zeros((mat_height, mat_height))
-    qp_c = jnp.zeros((mat_height, ))
+    qp_q = jnp.zeros((F_size, F_size))
+    qp_c = jnp.zeros((F_size, ))
 
     # Make Costs
 
-    big_q_centroid, small_c_centroid = centroidal_acc_q(com_ref)
-    big_q_centroid *= weights[0]
-    small_c_centroid *= weights[0]
-    qp_q = qp_q.at[:6, :6].add(big_q_centroid)
-    qp_c = qp_c.at[:6].add(small_c_centroid)
-
     big_q_mag, small_c_mag = f_mag_q(w, ids)
-    big_q_mag *= weights[1]
-    small_c_mag *= weights[1]
-    qp_q = qp_q.at[6:, 6:].add(big_q_mag)
-    qp_c = qp_c.at[6:].add(small_c_mag)
+    big_q_mag *= weights[0]
+    small_c_mag *= weights[0]
+    qp_q = big_q_mag
+    qp_c = small_c_mag
 
-    big_q_ref, small_c_ref = f_ref_q(f_ref, ids)
-    big_q_ref *= weights[2]
-    small_c_ref *= weights[2]
-    qp_q = qp_q.at[6:, 6:].add(big_q_ref)
-    qp_c = qp_c.at[6:].add(small_c_ref)
+    big_q_tau, small_c_tau = joint_torque_q(jacs, tau_ref)
+    big_q_tau *= weights[1]
+    small_c_tau *= weights[1]
 
-    big_q_tau, small_c_tau = joint_torque_q(jacs)
-    big_q_tau *= weights[3]
-    small_c_tau *= weights[3]
-
-    qp_q = qp_q.at[6:, 6:].add(big_q_tau)
-    qp_c = qp_c.at[6:].add(small_c_tau)
+    qp_q += big_q_tau
+    qp_c += small_c_tau
 
     # Make Cons
 
     cons_lhs_list = []
     cons_rhs_list = []
 
-    centroid_lhs, centroid_rhs = centroidal_qacc_cons(select, a)
+    centroid_lhs, centroid_rhs = centroidal_qacc_cons(select, a, g, com_ref)
 
     cons_lhs_list.append(centroid_lhs)
     cons_rhs_list.append(centroid_rhs)
@@ -133,21 +120,18 @@ def ft_ref(eefpos, com_pos,
 
     sol = schur_solve(qp_q, qp_c, cons_lhs, cons_rhs)
 
-    q_ddot_com = sol[:6]
-    f = sol[6:6 + ids["eef_num"] * 6]
+    f = sol
 
     tau = -jacs[:, 6:].T @ f
 
     debug_dict = {}
     if debug:
-        cent_err = eval_qp(big_q_centroid, small_c_centroid, q_ddot_com)
         mag_err = eval_qp(big_q_mag, small_c_mag, f)
-        ref_err = eval_qp(big_q_ref, small_c_ref, f)
         tau_err = eval_qp(big_q_tau, small_c_tau, f)
         debug_dict = {
-            "errors": jnp.array([cent_err, mag_err, ref_err, tau_err])
+            "errors": jnp.array([mag_err, tau_err])
         }
-    return tau, f, q_ddot_com, debug_dict
+    return tau, f, debug_dict
 
 def make_filt_state(ids):
     state = {
@@ -160,14 +144,14 @@ def ctrl2logits(act, ids):
     des_com_vel = act[ids["ctrl_num"]:ids["ctrl_num"] + 3]
     des_com_angvel = act[ids["ctrl_num"] + 3 : ids["ctrl_num"] + 6]
     w = act[ids["ctrl_num"] + 6 : ids["ctrl_num"] + ids["eef_num"] + 6]
-    frc = act[ids["ctrl_num"] + ids["eef_num"] + 6:
-              ids["ctrl_num"] + ids["eef_num"] * 4 + 6]
+    torque = act[ids["ctrl_num"] + ids["eef_num"] + 6:
+              ids["ctrl_num"] * 2 + ids["eef_num"] + 6]
     logits = {
         "des_pos": des_pos,
         "des_com_vel": des_com_vel,
         "des_com_angvel": des_com_angvel,
         "w": w,
-        "frc": frc
+        "torque": torque
     }
     return logits
 
@@ -185,33 +169,31 @@ def ctrl2components(data, act, ids):
     des_com_vel = des_com_vel * (des_com_vel_mag / (1e-6 + jnp.linalg.norm(des_com_vel)))
     w = logits["w"]
 
-    s = nn.sigmoid(w)
-
-    frc = logits["frc"].reshape([ids["eef_num"], 3])
-    global_frc = jax.vmap(lmath.rotate_des_com_vel, in_axes=(0, None))(frc, data)
-    global_frc *= 0.40
-    frc_scalar_mag = ids["g"] * ids["mass"]
-    global_frc = global_frc * frc_scalar_mag * s[:, None]
-    global_frc_mag = jnp.clip(jnp.linalg.norm(global_frc, axis=1), 0.0, frc_scalar_mag * 3.0)
-    global_frc = global_frc * (global_frc_mag / 
-                               (1e-6 + jnp.linalg.norm(global_frc, axis=1)))[:, None]
+    torque_logit = jnp.tanh(logits["torque"])
+    tau_limits = ids["tau_limits"]
+    vel_limit = jnp.ones_like(tau_limits) * 10.0
+    qvel = data.qvel[ids["joint_vel_ids"]][6:]
+    tau_naive = tau_limits * torque_logit
+    spd_fac = jnp.clip(jnp.abs(qvel), 0.0, vel_limit) / vel_limit
+    sign = jnp.where(qvel * torque_logit >= 0, 1.0, 0.0)
+    tau = tau_naive * (1.0 - spd_fac * sign)
 
     outputs = {
         "des_pos": des_pos,
         "des_com_vel": des_com_vel,
         "des_com_angvel": des_angvel,
         "w": w,
-        "frc": global_frc
+        "torque": tau
     }
     return outputs
 
-def highlvlPD(data, des_com_vel, des_angvel, ids):
+def highlvlPD(data, com_vel, des_com_vel, des_angvel, ids):
     qvel = data.qvel[ids["joint_vel_ids"]]
 
     world_com_vel = lmath.rotate_des_com_vel(des_com_vel, data)
     
     c_lin_p_gain = 3.0
-    com_acc = c_lin_p_gain * (world_com_vel - qvel[0:3])
+    com_acc = c_lin_p_gain * (world_com_vel - com_vel)
     
     c_ang_p_gain = 0.10
     com_angacc = c_ang_p_gain * (des_angvel - qvel[3:6])
@@ -227,7 +209,7 @@ def step(model, data, act, ids, is_mjx = False,
     des_com_vel = output["des_com_vel"]
     des_angvel = output["des_com_angvel"]
     w = output["w"]
-    f_ref = output["frc"]
+    tau = output["torque"]
     
     p_weight = ids["p_gains"]
     d_weight = ids["d_gains"]
@@ -236,12 +218,12 @@ def step(model, data, act, ids, is_mjx = False,
     qvel = data.qvel[ids["joint_vel_ids"]][6:]
 
     pd_tau = p_weight * (des_pos - qpos)
-    com_accs, world_com_vel = highlvlPD(data, des_com_vel, des_angvel, ids)
-    jacs, eefpos, com_pos, h = lmodel.jac_only_kin_values(model, data, ids, is_mjx = is_mjx)
+    jacs, eefpos, com_pos, com_vel, h = lmodel.jac_only_kin_values(model, data, ids, is_mjx = is_mjx)
+    com_accs, world_com_vel = highlvlPD(data, com_vel, des_com_vel, des_angvel, ids)
     
     #s = jnp.where(nn.sigmoid(w) > 0.5, 1.0, 0.0)
-    u_ff, f, q_ddot_com, norm_dict = ft_ref(
-        eefpos, com_pos, jacs, f_ref, com_accs, w, ids, debug, barrier = True
+    u_ff, f, norm_dict = ft_ref(
+        eefpos, com_pos, jacs, tau, com_accs, w, ids, debug, barrier = True
     )
 
     nle_ff = h[6:]
@@ -269,15 +251,14 @@ def step(model, data, act, ids, is_mjx = False,
             "u_pd": pd_tau,
             "u_final": u_final,
             "f": f,
-            "q_ddot_com": q_ddot_com,
             "com_ref": com_accs,
             "des_com_vel": world_com_vel,
             "des_angvel": des_angvel,
-            "real_com_vel": data.qvel[0:3],
+            "real_com_vel": com_vel,
             "real_angvel": data.qvel[3:6],
             "qp_errors": norm_dict["errors"],
             "des_pos": des_pos,
-            "f_ref": f_ref.reshape(-1),
+            "tau": tau,
         }
         if filt_state is not None:
             debug_info["u_filt"] = u_filt
@@ -293,12 +274,7 @@ def default_act(ids):
     des_com_vel = jnp.zeros([3])
     des_com_angvel = jnp.zeros([3])
     w = jnp.array([10., 10., -5., -5.])
-    frc = jnp.array([
-        0., 0., 0.5,
-        0., 0., 0.5,
-        0., 0., 0.,
-        0., 0., 0.
-    ]) / 0.40
+    frc = jnp.zeros([ids["ctrl_num"]])
     act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w, frc], axis = 0)
     return act
 
@@ -383,13 +359,7 @@ def raise_right_leg(com_pos, data, t, tmax, ids):
     w = jnp.array([10., -5., -5., -5.])
     #des_pos_pd = jnp.zeros([ids["ctrl_num"]])
 
-    frc = jnp.array([
-        0., 0., 1.0,
-        0., 0., 0.0,
-        0., 0., 0.,
-        0., 0., 0.
-    ]) / 0.40
-
+    frc = jnp.zeros([ids["ctrl_num"]])
 
     act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w, frc], axis = 0)
     

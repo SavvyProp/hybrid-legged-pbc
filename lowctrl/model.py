@@ -110,10 +110,56 @@ def get_kin_values(model, data, ids, is_mjx = True):
     com_pos = get_compos(data)
     return m, h, j_stack, jvp_, jac_com_, com_jvp, eef_pos, com_pos
 
+# ...existing code...
+
+def compute_com_vel(mjx_model, mjx_data, method: str = "jac") -> jnp.ndarray:
+    """
+    Compute world-frame linear center-of-mass velocity in MJX.
+
+    method:
+      "jac"  : J_com @ qvel   (fast, differentiable)
+      "mass" : mass-weighted sum of individual body COM velocities
+      "cvel" : use mjx_data.cvel (per-body spatial COM velocities) + orientation
+
+    Returns: (3,) COM linear velocity in world frame.
+    """
+    if method == "jac":
+        Jc = jac_com(mjx_model, mjx_data)            # (3, nv)
+        return Jc @ mjx_data.qvel                    # (3,)
+
+    elif method == "mass":
+        # Build per-body COM linear velocity
+        # v_com_i = xvelp_i + w_i x (xipos_i - xpos_i)
+        xvelp = mjx_data.xvelp        # (nbody,3) linear vel of body frame origin
+        xvelr = mjx_data.xvelr        # (nbody,3) angular vel of body
+        xipos = mjx_data.xipos        # (nbody,3) body COM pos
+        xpos  = mjx_data.xpos         # (nbody,3) body frame origin pos
+        v_com = xvelp + jnp.cross(xvelr, (xipos - xpos))
+        w_mass = mjx_model.body_mass[:, None]
+        total = jnp.sum(w_mass)
+        return (jnp.sum(w_mass * v_com, axis=0) / total)
+
+    elif method == "cvel":
+        # mjx_data.cvel: (nbody, 6) spatial (angular, linear) COM velocity in body frame
+        # Convert linear part to world frame via xmat.
+        cvel = mjx_data.cvel.reshape(-1, 6)
+        lin_body = cvel[:, 3:6]                     # (nbody,3) linear COM vel in body frame
+        xmat = mjx_data.xmat.reshape(-1, 3, 3)      # body->world rotation
+        lin_world = jnp.einsum('bij,bi->bj', xmat, lin_body)
+        w_mass = mjx_model.body_mass[:, None]
+        total = jnp.sum(w_mass)
+        return (jnp.sum(w_mass * lin_world, axis=0) / total)
+
+    else:
+        raise ValueError(f"Unknown method '{method}' (choose 'jac', 'mass', or 'cvel').")
+
+# ...existing code...
+
 def jac_only_kin_values(model, data, ids, is_mjx = True):
     j_stack = jac_stack(model, data, ids, is_mjx = is_mjx)
     eef_pos = get_eefpos(data, ids)
     com_pos = get_compos(data)
     vel_ids = ids["joint_vel_ids"]
     h = data.qfrc_bias[vel_ids]
-    return j_stack, eef_pos, com_pos, h
+    com_vel = compute_com_vel(model, data, method = "cvel")
+    return j_stack, eef_pos, com_pos, com_vel, h

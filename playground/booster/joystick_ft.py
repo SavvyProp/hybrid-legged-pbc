@@ -113,7 +113,6 @@ def default_config() -> config_dict.ConfigDict:
               maqp_cons=0.50,
               vel_def=1.0,
               vel_action_rate = -0.001,
-              frc = 0.10
           ),
           tracking_sigma=0.25,
           max_foot_height=0.12,
@@ -603,22 +602,7 @@ class Joystick(t1_base.T1Env):
         "vel_action_rate": self._cost_vel_action_rate(action, info["last_act"]),
         "frc": self._rew_frc(components, data),
     }
-  
-  def _rew_frc(self, components, data):
-    l_true, r_true = get_forces(data, self.ids)
-    lf = components["frc"][0, :]
-    rf = components["frc"][1, :]
-    lh = components["frc"][2, :]
-    rh = components["frc"][3, :]
-    fac = 20000
-    left_frc_error = jp.sum(jp.square(lf - l_true)) / fac
-    right_frc_error = jp.sum(jp.square(rf - r_true)) / fac
-    left_hand_error = jp.sum(jp.square(lh)) / fac
-    right_hand_error = jp.sum(jp.square(rh)) / fac
-    frc_error = left_frc_error + right_frc_error + left_hand_error + right_hand_error
-    frc_rew = jp.exp(-frc_error)
-    return frc_rew
-  
+    
   def _cost_vel_action_rate(
       self, act: jax.Array, last_act: jax.Array
   ) -> jax.Array:
@@ -626,7 +610,6 @@ class Joystick(t1_base.T1Env):
     angvel_act = ctrl2logits(act, self.ids)["des_com_angvel"]
     vel_last_act = ctrl2logits(last_act, self.ids)["des_com_vel"]
     angvel_last_act = ctrl2logits(last_act, self.ids)["des_com_angvel"]
-    frc_act = ctrl2logits(act, self.ids)["frc"]
 
     c1 = jp.sum(jp.square(vel_act - 
                           vel_last_act))
