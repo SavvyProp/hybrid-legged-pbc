@@ -141,11 +141,12 @@ def compute_com_vel(mjx_model, mjx_data, method: str = "jac") -> jnp.ndarray:
 
     elif method == "cvel":
         # mjx_data.cvel: (nbody, 6) spatial (angular, linear) COM velocity in body frame
-        # Convert linear part to world frame via xmat.
+        # Convert linear part to world frame via xmat (R: body->world, so world = R @ body).
         cvel = mjx_data.cvel.reshape(-1, 6)
         lin_body = cvel[:, 3:6]                     # (nbody,3) linear COM vel in body frame
         xmat = mjx_data.xmat.reshape(-1, 3, 3)      # body->world rotation
-        lin_world = jnp.einsum('bij,bi->bj', xmat, lin_body)
+        # Correct multiplication: world = R @ body (previous code used R^T)
+        lin_world = jnp.einsum('bij,bj->bi', xmat, lin_body)
         w_mass = mjx_model.body_mass[:, None]
         total = jnp.sum(w_mass)
         return (jnp.sum(w_mass * lin_world, axis=0) / total)
@@ -161,5 +162,6 @@ def jac_only_kin_values(model, data, ids, is_mjx = True):
     com_pos = get_compos(data)
     vel_ids = ids["joint_vel_ids"]
     h = data.qfrc_bias[vel_ids]
-    com_vel = compute_com_vel(model, data, method = "cvel")
+    com_vel = compute_com_vel(model, data, method = "jac")
+    #com_vel = data.cvel[0, 3:6]
     return j_stack, eef_pos, com_pos, com_vel, h

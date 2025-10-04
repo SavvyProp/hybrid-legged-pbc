@@ -296,6 +296,8 @@ class Joystick(t1_base.T1Env):
     debug_dict = ft_ref.step(self._mjx_model, 
                            data, ft_ref.default_act(self.ids), self.ids, 
                            is_mjx=True, debug=True)
+    for key in debug_dict:
+      debug_dict[key] = jp.zeros_like(debug_dict[key])
     info = {
         "rng": rng,
         "step": 0,

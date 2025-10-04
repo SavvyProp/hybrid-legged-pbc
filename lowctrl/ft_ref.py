@@ -189,7 +189,7 @@ def ctrl2components(data, act, ids):
 
 def highlvlPD(data, com_vel, des_com_vel, des_angvel, ids):
     qvel = data.qvel[ids["joint_vel_ids"]]
-    com_vel = qvel[0:3]
+    #com_vel = qvel[0:3]
 
     world_com_vel = lmath.rotate_des_com_vel(des_com_vel, data)
     
@@ -220,6 +220,8 @@ def step(model, data, act, ids, is_mjx = False,
 
     pd_tau = p_weight * (des_pos - qpos)
     jacs, eefpos, com_pos, com_vel, h = lmodel.jac_only_kin_values(model, data, ids, is_mjx = is_mjx)
+    #com_vel = data.qvel[ids["joint_vel_ids"]][0:3]
+    
     com_accs, world_com_vel = highlvlPD(data, com_vel, des_com_vel, des_angvel, ids)
     
     #s = jnp.where(nn.sigmoid(w) > 0.5, 1.0, 0.0)
