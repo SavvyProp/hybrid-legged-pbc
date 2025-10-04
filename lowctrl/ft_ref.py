@@ -75,7 +75,7 @@ def eval_qp(big_q, small_q, x):
 def ft_ref(eefpos, com_pos, 
          jacs, tau_ref, com_ref, w, ids, debug,
          barrier = True):
-    weights = jnp.array([1e-4, 1e-2])
+    weights = jnp.array([1e-4, 3e-2])
     F_size = ids["eef_num"] * 6
     select = {
         "F": jnp.eye(F_size),
@@ -189,6 +189,7 @@ def ctrl2components(data, act, ids):
 
 def highlvlPD(data, com_vel, des_com_vel, des_angvel, ids):
     qvel = data.qvel[ids["joint_vel_ids"]]
+    com_vel = qvel[0:3]
 
     world_com_vel = lmath.rotate_des_com_vel(des_com_vel, data)
     

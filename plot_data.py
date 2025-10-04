@@ -270,6 +270,7 @@ def main():
     u_final = load_matrix(os.path.join('data', 'u_final.csv'))
 
     f_ref = load_matrix(os.path.join('data', 'f_ref.csv'))
+    tau = load_matrix(os.path.join('data', 'tau.csv'))
 
     range_lower = 300
     range_upper = 500
@@ -320,9 +321,9 @@ def main():
     fig.savefig(out_path, dpi=150)
 
     # New: focused plot for cols 11..16 (1-based)
-    plot_cols_11_16_overlaid(u_final[range_lower:range_upper, :], 
+    plot_cols_11_16_overlaid(tau[range_lower:range_upper, :], 
                              u[range_lower:range_upper, :], 
-                             legend=['u_filt', 'u'],
+                             legend=['u_ref', 'u_ff'],
                              ylabel='torque (Nm)',
                              save_path=os.path.join('data', 'u_pd_tau_cols_11_16.png'))
     
@@ -335,8 +336,6 @@ def main():
 
     # New: plot for f[:, 0:12]
     plot_f_first12(f[range_lower:range_upper, :], save_path=os.path.join('data', 'f_first12.png'))
-
-    plot_f_first12(f_ref[range_lower:range_upper, :], save_path=os.path.join('data', 'f_ref_first12.png'), suptitle="f_ref[:, 0:12] over time")
 
     # New: plot for q_ddot_com vs com_ref
     plot_qddot_com_vs_ref(q_ddot_com[range_lower:range_upper, :], 
