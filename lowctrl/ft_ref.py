@@ -213,7 +213,7 @@ def highlvlPD(data, des_com_vel, des_angvel, ids):
     c_lin_p_gain = 3.0
     com_acc = c_lin_p_gain * (world_com_vel - qvel[0:3])
     
-    c_ang_p_gain = 0.10
+    c_ang_p_gain = 0.05
     com_angacc = c_ang_p_gain * (des_angvel - qvel[3:6])
 
     com_accs = jnp.concatenate([com_acc, com_angacc], axis = 0)
@@ -259,7 +259,7 @@ def step(model, data, act, ids, is_mjx = False,
         alpha = 0.7
         u_filt = alpha * filt_state["prev_u"] + (1 - alpha) * u_ff
         filt_state["prev_u"] = u_filt
-        u_final = jnp.clip(u_filt + pd_tau, -tau_limits, tau_limits)
+        u_final = jnp.clip(u, -tau_limits, tau_limits)
     else:
         u_final = jnp.clip(u, -tau_limits, tau_limits)
     if debug:
