@@ -27,7 +27,7 @@ def make_centroidal_a(eefpos, com_pos, ids):
 # Costs
 
 def f_mag_q(w, ids):
-    logits = -jnp.clip(w, -6.0, 6.0)
+    logits = -jnp.clip(w, -10.0, 10.0)
     big_qp = lmath.vec2diags(jnp.exp(logits), ids)
     tau_cost = lmath.torqueCost(40.0, ids)
     big_qp = tau_cost @ big_qp 
