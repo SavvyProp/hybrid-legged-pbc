@@ -600,7 +600,6 @@ class Joystick(t1_base.T1Env):
         "maqp_cons": self._reward_maqp_cons(data, info, action),
         "vel_def": self._reward_des_vel(components, info["command"]),
         "vel_action_rate": self._cost_vel_action_rate(action, info["last_act"]),
-        "frc": self._rew_frc(components, data),
     }
     
   def _cost_vel_action_rate(
