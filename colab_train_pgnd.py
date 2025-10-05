@@ -33,6 +33,8 @@ def make_trainfn():
                 baseline_rew += metrics[name]
         y_data_baseline.append(baseline_rew)
 
+        print(metrics)
+
         plt.xlim([0, ppo_params["num_timesteps"] * 1.25])
         plt.xlabel("# environment steps")
         plt.ylabel("reward per episode")
