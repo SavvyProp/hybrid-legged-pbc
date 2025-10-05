@@ -217,7 +217,6 @@ def step(model, data, act, ids, is_mjx = False,
     qpos = data.qpos[ids["joint_pos_ids"]][7:]
     qvel = data.qvel[ids["joint_vel_ids"]][6:]
 
-    pd_tau = p_weight * (des_pos - qpos) * 0.5
     jacs, eefpos, com_pos, com_vel, h = lmodel.jac_only_kin_values(model, data, ids, is_mjx = is_mjx)
     #com_vel = data.qvel[ids["joint_vel_ids"]][0:3]
     
@@ -229,10 +228,20 @@ def step(model, data, act, ids, is_mjx = False,
     )
 
     nle_ff = h[6:]
+    u_ff = u_ff + nle_ff
+
+    # Lower pd gains based on ff torque
+
+    torque_fac = jnp.clip(jnp.abs(u_ff) / (ids["tau_limits"] + 1e-6), 0.0, 1.0)
+
+    p_weight = p_weight * (1.0 - torque_fac * 0.5)
+
+    pd_tau = p_weight * (des_pos - qpos)
+
 
     u_ff = jnp.nan_to_num(u_ff, posinf = 0.0, neginf = 0.0, nan = 0.0)
     u_ff = jnp.clip(u_ff, -ids["tau_limits"] * 1.0, ids["tau_limits"] * 1.0)
-    u_ff = u_ff + nle_ff
+    
     u = u_ff + pd_tau
 
     #u_final = u * (pd_weight) + pd_tau * (1.0 - pd_weight)
