@@ -321,9 +321,9 @@ def main():
     fig.savefig(out_path, dpi=150)
 
     # New: focused plot for cols 11..16 (1-based)
-    plot_cols_11_16_overlaid(tau[range_lower:range_upper, :], 
+    plot_cols_11_16_overlaid(u_final[range_lower:range_upper, :], 
                              u[range_lower:range_upper, :], 
-                             legend=['u_ref', 'u_ff'],
+                             legend=['u_ff + u_pd', 'u_ff'],
                              ylabel='torque (Nm)',
                              save_path=os.path.join('data', 'u_pd_tau_cols_11_16.png'))
     

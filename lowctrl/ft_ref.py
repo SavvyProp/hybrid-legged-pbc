@@ -74,7 +74,7 @@ def eval_qp(big_q, small_q, x):
 def ft_ref(eefpos, com_pos, 
          jacs, tau_ref, com_ref, w, ids, debug,
          barrier = True):
-    weights = jnp.array([1e-4, 1e-2])
+    weights = jnp.array([1e-3, 1e-2])
     F_size = ids["eef_num"] * 6
     select = {
         "F": jnp.eye(F_size),
@@ -217,7 +217,7 @@ def step(model, data, act, ids, is_mjx = False,
     qpos = data.qpos[ids["joint_pos_ids"]][7:]
     qvel = data.qvel[ids["joint_vel_ids"]][6:]
 
-    pd_tau = p_weight * (des_pos - qpos)
+    pd_tau = p_weight * (des_pos - qpos) * 0.5
     jacs, eefpos, com_pos, com_vel, h = lmodel.jac_only_kin_values(model, data, ids, is_mjx = is_mjx)
     #com_vel = data.qvel[ids["joint_vel_ids"]][0:3]
     
