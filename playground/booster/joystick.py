@@ -62,10 +62,10 @@ def default_config() -> config_dict.ConfigDict:
               base_height=0.0,
               # Energy related rewards.
               torques=0.0,
-              action_rate=-0.005,
+              action_rate=-0.001,
               energy=0.0,
-              dof_acc=0.0,
-              dof_vel=0.0,
+              dof_acc=-5e-7,
+              dof_vel=-5e-5,
               # Feet related rewards.
               feet_clearance=0.0,
               feet_air_time=2.0,
@@ -75,7 +75,7 @@ def default_config() -> config_dict.ConfigDict:
               # Other rewards.
               stand_still=0.0,
               alive=0.25,
-              termination=0.0,
+              termination=-100.0,
               # Pose related rewards.
               joint_deviation_knee=-0.1,
               joint_deviation_hip=-0.1,

@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from brax.training.agents.ppo import networks as ppo_networks
 from brax.training.agents.ppo import train as ppo
 from mujoco_playground import wrapper
-from playground.booster.config import ppo_params, baseline_reward_names
+from playground.booster.config import ppo_params
 
 def make_trainfn():
     env_cfg = joystick.default_config()
@@ -16,7 +16,6 @@ def make_trainfn():
 
 
     x_data, y_data, y_dataerr = [], [], []
-    y_data_baseline = []
     times = [datetime.now()]
 
 
@@ -26,12 +25,6 @@ def make_trainfn():
         x_data.append(num_steps)
         y_data.append(metrics["eval/episode_reward"])
         y_dataerr.append(metrics["eval/episode_reward_std"])
-        baseline_rew = 0.0
-        for rname in baseline_reward_names:
-            name = "eval/episode_reward/" + rname
-            if name in metrics:
-                baseline_rew += metrics[name]
-        y_data_baseline.append(baseline_rew)
 
         plt.xlim([0, ppo_params["num_timesteps"] * 1.25])
         plt.xlabel("# environment steps")
