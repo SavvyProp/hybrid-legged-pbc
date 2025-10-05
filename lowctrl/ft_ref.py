@@ -173,16 +173,16 @@ def ctrl2components(data, act, ids):
     vel_limit = jnp.ones_like(tau_limits) * 10.0
     qvel = data.qvel[ids["joint_vel_ids"]][6:]
     tau_naive = tau_limits * torque_logit
-    spd_fac = jnp.clip(jnp.abs(qvel), 0.0, vel_limit) / vel_limit
-    sign = jnp.where(qvel * torque_logit >= 0, 1.0, 0.0)
-    tau = tau_naive * (1.0 - spd_fac * sign)
+    #spd_fac = jnp.clip(jnp.abs(qvel), 0.0, vel_limit) / vel_limit
+    #sign = jnp.where(qvel * torque_logit >= 0, 1.0, 0.0)
+    #tau = tau_naive * (1.0 - spd_fac * sign)
 
     outputs = {
         "des_pos": des_pos,
         "des_com_vel": des_com_vel,
         "des_com_angvel": des_angvel,
         "w": w,
-        "torque": tau
+        "torque": tau_naive
     }
     return outputs
 
