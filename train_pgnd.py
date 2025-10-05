@@ -40,6 +40,7 @@ def progress(num_steps, metrics):
   plt.ylabel("reward per episode")
   plt.title(f"y={y_data[-1]:.3f}")
   plt.errorbar(x_data, y_data, yerr=y_dataerr, color="blue")
+  plt.plot(x_data, y_data_baseline, color="red")
   plt.savefig("plots/progress{}.png".format(num_steps))
   plt.clf()
 

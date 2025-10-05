@@ -38,6 +38,7 @@ def make_trainfn():
         plt.ylabel("reward per episode")
         plt.title(f"y={y_data[-1]:.3f}")
         plt.errorbar(x_data, y_data, yerr=y_dataerr, color="blue")
+        plt.plot(x_data, y_data_baseline, color="red")
         plt.show()
 
     ppo_training_params = dict(ppo_params)
