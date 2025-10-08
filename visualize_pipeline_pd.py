@@ -4,7 +4,6 @@ from brax.training.agents.ppo import train as ppo
 from brax.training.agents.ppo import networks as ppo_networks
 from brax.io import model
 from matplotlib import pyplot as plt
-from envs.booster_flatwalk_pd import FlatwalkEnv, metrics_dict
 import os
 import jax
 import mujoco
@@ -16,7 +15,6 @@ from brax.training.acme import running_statistics
 from playground.booster import joystick
 #from playground.booster import joystick_pbc as joystick
 from playground.booster.config import ppo_params
-from lowctrl.eefpbc import ctrl2components
 from models.booster_t1_pgnd.booster_ids import ids
 env = joystick.Joystick()
 
@@ -42,15 +40,15 @@ def makeIFN():
     make_inference_fn = ppo_networks.make_inference_fn(ppo_network)
     return make_inference_fn
 
-def debug_eefpbc(act):
-    from models.booster_t1_pgnd.booster_ids import ids
-    (des_pos, 
-     qp_weights, 
-     w, oriens, 
-    ) = ctrl2components(act, ids)
-    print(w)
+rew = 0.0
+from playground.booster.config import baseline_reward_names
+def metrics_count(rew, metrics):
+    for rname in baseline_reward_names:
+        name = "reward/" + rname
+        rew += metrics[name]
+    return rew
 
-dir = "training/test_pd_3"
+dir = "training/pd_1"
 
 model_path = dir + "/walk_policy"
 saved_params = model.load_params(model_path)
@@ -81,6 +79,7 @@ for c in range(1000):
     #nn_p, nn_d = raw_pd(raw_action)
     state = jit_step(state, ctrl)
     pipeline_state = state.data
+    rew = metrics_count(rew, state.metrics)
     #print(state.data.contact)
     #print(ids["col"])
     #print(state.data.sensordata)
@@ -94,7 +93,7 @@ for c in range(1000):
 
 
 print("Rollout precomputed")
-
+print("Total reward:", rew) 
 viewer = mujoco.viewer.launch_passive(mj_model, data)
 import time
 while True:

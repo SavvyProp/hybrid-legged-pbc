@@ -63,8 +63,6 @@ def centroidal_qacc_cons(select, big_a, g, com_ref):
     lhs = big_a @ select["F"]
     rhs = com_ref - g
     return lhs, rhs
-
-
 # QP Solver
 
 def eval_qp(big_q, small_q, x):

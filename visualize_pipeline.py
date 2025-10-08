@@ -58,6 +58,14 @@ def debug_eefpbc(state, prev_info, act, i):
     #print("u_change:", jnp.sum(jnp.square(current_u - prev_u)))
     #print("logits qp_weight:", logits["qc_weight"])
 
+rew = 0.0
+from playground.booster.config import baseline_reward_names
+def metrics_count(rew, metrics):
+    for rname in baseline_reward_names:
+        name = "reward/" + rname
+        rew += metrics[name]
+    return rew
+
 dir = "training/t_7"
 
 model_path = dir + "/walk_policy"
@@ -81,8 +89,18 @@ nn_p_list = []
 states = []
 prev_info = state.info
 
-
 command = jnp.array([0.5, 0.0, 0.0])
+
+# ...existing imports...
+
+def apply_wrench_to_body(state, body_id: int, wrench_6: jnp.ndarray):
+    """Return a new state with xfrc_applied[body_id] = wrench_6 (Fx,Fy,Fz,Tx,Ty,Tz) in world frame."""
+    d = state.data
+    print(d.xfrc_applied[body_id])
+    xfrc = d.xfrc_applied.at[body_id].set(wrench_6)
+    d = d.replace(xfrc_applied=xfrc)
+    return state.replace(data=d)
+# ...existing code...
 
 for c in range(1000):
     #state.info["command"] = command
@@ -92,13 +110,19 @@ for c in range(1000):
     
     #raw_action = ctrl[2 * HIDDEN_SIZE * DEPTH:]
     #nn_p, nn_d = raw_pd(raw_action)
+    wrench = jnp.array([0, 0., 0., 0., 0., 0.])
+
+    state = apply_wrench_to_body(state, 1, wrench)  # Apply wrench to body with ID 1
+
     state = jit_step(state, ctrl)
     pipeline_state = state.data
-    print(state.done)
+
     #print(state.data.contact)
     #print(state.info["last_contact"])
     debug_eefpbc(state.data, prev_info, ctrl, c)
     prev_info = state.info
+
+    rew = metrics_count(rew, state.metrics)
     #print(ids["col"])
     #print(state.data.sensordata)
     #debug_eefpbc(ctrl)
@@ -112,7 +136,7 @@ for c in range(1000):
 for key in array_dict:
     np.savetxt(f"data/{key}.csv", array_dict[key].reshape(1000, -1), delimiter=",")
 print("Rollout precomputed")
-
+print("Total reward:", rew)
 viewer = mujoco.viewer.launch_passive(mj_model, data)
 import time
 while True:
@@ -124,7 +148,6 @@ while True:
         pipeline_state = pipeline_state_list[c1]
         state = states[c1]
         #print(state.info["phase"])
-        print(state.metrics)
         time.sleep(0.02)
         mjx.get_data_into(data, mj_model, pipeline_state)
         viewer.sync()
