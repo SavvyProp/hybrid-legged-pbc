@@ -501,7 +501,7 @@ class Joystick(joystick.Joystick):
       )
       vel_err_rew = jp.exp(
         -jp.sum(jp.square(xvel - x_dot_ref)) / 0.25
-      ) - 0.5 * vel_mag
+      ) # - 0.5 * vel_mag
       rew_sum += pos_err_rew + vel_err_rew * 2.0
     return rew_sum / windows.shape[0]
   
