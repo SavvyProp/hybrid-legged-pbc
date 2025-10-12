@@ -28,19 +28,6 @@ from mujoco_playground._src.locomotion.t1 import t1_constants as consts
 from models.booster_t1_pgnd import booster_ids as bids
 from lowctrl import pd
 
-def step(
-    model: mjx.Model,
-    data: mjx.Data,
-    action: jax.Array,
-    n_substeps: int = 1,
-) -> mjx.Data:
-  def single_step(data, _):
-    ctrl = pd.step(model, data, action, bids.ids)
-    data = data.replace(ctrl = ctrl)
-    data = mjx.step(model, data)
-    return data, None
-
-  return jax.lax.scan(single_step, data, (), n_substeps)[0]
 
 def make_data(
     model: mujoco.MjModel,

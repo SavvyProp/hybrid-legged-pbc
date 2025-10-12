@@ -1,18 +1,3 @@
-# Copyright 2025 DeepMind Technologies Limited
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
-"""Joystick task for Booster T1."""
 
 from typing import Any, Dict, Optional, Union
 
@@ -28,40 +13,15 @@ from mujoco_playground._src import mjx_env
 #from mujoco_playground._src.locomotion.t1 import base as t1_base
 from mujoco_playground._src.locomotion.t1 import t1_constants as consts
 from playground.booster import joystick
-from rewards import rewards
-from lowctrl.ft_ref import ctrl2logits, default_act
-from lowctrl import ft_ref
-from rewards.mjx_col import get_contacts, get_forces
-from flax import linen as nn
 
-def phys_step(
-    model: mjx.Model,
-    data: mjx.Data,
-    filt_state,
-    action: jax.Array,
-    n_substeps: int = 1,
-) -> tuple[mjx.Data, Any]:
-  """Advance physics n_substeps times applying MAQP control each substep."""
-  def single_step(carry, _):
-    data, filt = carry
-    ctrl, filt = ft_ref.step(model, data, action, bids.ids,
-                           is_mjx=True,
-                           filt_state=filt)
-    data = data.replace(ctrl=ctrl)
-    data = mjx.step(model, data)
-    return (data, filt), None
-
-  (data, filt_state), _ = jax.lax.scan(single_step,
-                                       (data, filt_state),
-                                       None,
-                                       length=n_substeps)
-  return data, filt_state
+from rewards.mjx_col import get_contacts
+from rewards import facet
 
 def default_config() -> config_dict.ConfigDict:
   return config_dict.create(
       ctrl_dt=0.02,
       sim_dt=0.001,
-      episode_length=500,
+      episode_length=1000,
       action_repeat=1,
       action_scale=1.0,
       history_len=1,
@@ -79,7 +39,7 @@ def default_config() -> config_dict.ConfigDict:
       reward_config=config_dict.create(
           scales=config_dict.create(
               # Tracking related rewards.
-              tracking_lin_vel=1.0,
+              tracking_lin=0.50,
               tracking_ang_vel=0.5,
               # Base related rewards.
               lin_vel_z=0.0,
@@ -88,7 +48,7 @@ def default_config() -> config_dict.ConfigDict:
               base_height=0.0,
               # Energy related rewards.
               torques=0.0,
-              action_rate=-0.002,
+              action_rate=-0.001,
               energy=0.0,
               dof_acc=-5e-7,
               dof_vel=-5e-5,
@@ -109,10 +69,6 @@ def default_config() -> config_dict.ConfigDict:
               pose=-1.0,
               feet_distance=-1.0,
               collision=-1.0,
-              pbc_w=-1.0,
-              maqp_cons=0.50,
-              vel_def=1.0,
-              vel_action_rate = -0.001,
           ),
           tracking_sigma=0.25,
           max_foot_height=0.12,
@@ -131,11 +87,8 @@ def default_config() -> config_dict.ConfigDict:
       njmax=80,
   )
 
-from models.booster_t1_pgnd import booster_ids as bids
 
 class Joystick(joystick.Joystick):
-  """Track a joystick command."""
-
   def __init__(
       self,
       task: str = "flat_terrain",
@@ -150,6 +103,8 @@ class Joystick(joystick.Joystick):
       config = config,
       config_overrides=config_overrides
     )
+    self.force_traj_gen = facet.ForceTrajectory()
+    self.reference_traj = facet.ReferenceTrajectory()
 
   def reset(self, rng: jax.Array) -> mjx_env.State:
     qpos = self._init_q
@@ -198,27 +153,17 @@ class Joystick(joystick.Joystick):
     cmd = self.sample_command(cmd_rng)
 
     # Sample push interval.
-    rng, push_rng = jax.random.split(rng)
-    push_interval = jax.random.uniform(
-        push_rng,
-        minval=self._config.push_config.interval_range[0],
-        maxval=self._config.push_config.interval_range[1],
-    )
-    push_interval_steps = jp.round(push_interval / self.dt).astype(jp.int32)
-    debug_dict = ft_ref.step(self._mjx_model, 
-                           data, ft_ref.default_act(self.ids), self.ids, 
-                           is_mjx=True, debug=True)
-    for key in debug_dict:
-      debug_dict[key] = jp.zeros_like(debug_dict[key])
+
+    force_traj, rng = self.force_traj_gen.sample_force_traj(rng)
+    kin_hist = self.reference_traj.make_rolling_history()
+
     info = {
         "rng": rng,
         "step": 0,
         "command": cmd,
-        "last_u_act": jp.zeros(self.ids["ctrl_num"]),
         "last_act": jp.zeros(self.action_size),
         "last_last_act": jp.zeros(self.action_size),
-        #"motor_targets": jp.zeros(self.action_size),
-        "motor_targets": default_act(self.ids),
+        "motor_targets": jp.zeros(self.action_size),
         "feet_air_time": jp.zeros(2),
         "last_contact": jp.zeros(2, dtype=bool),
         "swing_peak": jp.zeros(2),
@@ -226,13 +171,11 @@ class Joystick(joystick.Joystick):
         "phase_dt": phase_dt,
         "phase": phase,
         # Push related.
-        "push": jp.array([0.0, 0.0]),
-        "push_step": 0,
-        "push_interval_steps": push_interval_steps,
         "filtered_linvel": jp.zeros(3),
         "filtered_angvel": jp.zeros(3),
-        "filt_state": ft_ref.make_filt_state(self.ids),
-        "ft_dict": debug_dict,
+        "force_traj": force_traj,
+        "kin_hist": kin_hist,
+        "time": 0.0,
     }
 
     metrics = {}
@@ -246,36 +189,82 @@ class Joystick(joystick.Joystick):
     obs = self._get_obs(data, info, contact)
     reward, done = jp.zeros(2)
     return mjx_env.State(data, obs, reward, done, metrics, info)
+  
+  def sample_command(self, rng: jax.Array, data = None) -> jax.Array:
+    base_body_id = self.ids["base_id"]
+    if data is None:
+      base_pos = jp.zeros(3)
+    else:
+      base_pos = data.xpos[base_body_id]
+    rng1, rng2, rng3, rng4, rng5, rng6 = jax.random.split(rng, 6)
 
+    t_exp = 2.0
+
+    lin_vel_x = jax.random.uniform(
+        rng1, minval=self._config.lin_vel_x[0], maxval=self._config.lin_vel_x[1]
+    )
+    lin_vel_y = jax.random.uniform(
+        rng2, minval=self._config.lin_vel_y[0], maxval=self._config.lin_vel_y[1]
+    )
+    z = 0.665
+    des_pos = base_pos[:2] + jp.array([lin_vel_x, lin_vel_y]) * t_exp
+    ang_vel_yaw = jax.random.uniform(
+        rng3,
+        minval=self._config.ang_vel_yaw[0],
+        maxval=self._config.ang_vel_yaw[1],
+    )
+
+    k_p = jax.random.uniform(rng4,
+                             minval=0.0,
+                             maxval=5.0)
+    k_d = 2 * jp.sqrt(k_p)
+    m = jax.random.uniform(rng6,
+                           minval=0.8,
+                           maxval=1.2) * self.ids["mass"]
+
+    # With 10% chance, set everything to zero.
+    return jp.where(
+        jax.random.bernoulli(rng4, p=0.1),
+        jp.hstack([base_pos[0], base_pos[1], z, 3.0, 0.5, m, 0.0]),
+        jp.hstack([des_pos[0], des_pos[1], z, k_p, k_d, m
+                   , ang_vel_yaw]),
+    )
+  
+  def apply_pushes(self, data: mjx.Data, info: dict[str, Any]):
+    lin_force = self.force_traj_gen.get_force_at_time(
+        info["force_traj"], info["time"])
+    return data, lin_force
+  
+  def update_kin_hist(self, data: mjx.Data, info: dict[str, Any], f_ext):
+    x_pos = data.xpos[self.ids["base_id"]]
+    x_vel = data.qvel[:3]
+    acc = facet.get_ddot_x_ref(
+        info["command"], x_pos, x_vel, f_ext
+    )
+    kin_hist = self.reference_traj.update_rolling_history(
+        self.dt, info["kin_hist"], x_pos, x_vel, acc
+    )
+    info["kin_hist"] = kin_hist
+    return info
+
+  
   def step(self, state: mjx_env.State, action: jax.Array) -> mjx_env.State:
     state.info["rng"], push1_rng, push2_rng = jax.random.split(
         state.info["rng"], 3
     )
-    push_theta = jax.random.uniform(push1_rng, maxval=2 * jp.pi)
-    push_magnitude = jax.random.uniform(
-        push2_rng,
-        minval=self._config.push_config.magnitude_range[0],
-        maxval=self._config.push_config.magnitude_range[1],
-    )
-    push = jp.array([jp.cos(push_theta), jp.sin(push_theta)])
-    push *= (
-        jp.mod(state.info["push_step"] + 1, state.info["push_interval_steps"])
-        == 0
-    )
-    push *= self._config.push_config.enable
-    qvel = state.data.qvel
-    qvel = qvel.at[:2].set(push * push_magnitude + qvel[:2])
-    data = state.data.replace(qvel=qvel)
+
+    # Code to do force pushes
+
+    data, lin_force = self.apply_pushes(state.data, state.info)
     state = state.replace(data=data)
-
-    # state = self._reset_if_outside_bounds(state)
-
+    
     motor_targets = action #self._default_pose + action * self._config.action_scale
-    data, filt_state = phys_step(
-        self.mjx_model, state.data, state.info["filt_state"], motor_targets, self.n_substeps
+    data = joystick.step(
+        self.mjx_model, state.data, motor_targets, self.n_substeps, self.ids
     )
+    # Code to update kin hist
 
-    state.info["filt_state"] = filt_state
+    self.update_kin_hist(state.data, state.info, lin_force)
 
     state.info["motor_targets"] = motor_targets
 
@@ -288,8 +277,8 @@ class Joystick(joystick.Joystick):
         angvel * 1.0 + state.info["filtered_angvel"] * 0.0
     )
 
-    #contact = jp.hstack([jp.any(left_feet_contact), jp.any(right_feet_contact)])
     contact = get_contacts(data.contact, self.ids)
+
     contact_filt = contact | state.info["last_contact"]
     first_contact = (state.info["feet_air_time"] > 0.0) * contact_filt
     state.info["feet_air_time"] += self.dt
@@ -308,12 +297,8 @@ class Joystick(joystick.Joystick):
     }
     reward = jp.clip(sum(rewards.values()) * self.dt, 0.0, 10000.0)
 
-    state.info["ft_dict"] = ft_ref.step(self._mjx_model, 
-                           data, action, self.ids, 
-                           is_mjx=True, debug=True)
-    state.info["push"] = push
+    state.info["time"] += self.dt
     state.info["step"] += 1
-    state.info["push_step"] += 1
     phase_tp1 = state.info["phase"] + state.info["phase_dt"]
     state.info["phase"] = jp.fmod(phase_tp1 + jp.pi, 2 * jp.pi) - jp.pi
     state.info["phase"] = jp.where(
@@ -326,7 +311,7 @@ class Joystick(joystick.Joystick):
     state.info["rng"], cmd_rng = jax.random.split(state.info["rng"])
     state.info["command"] = jp.where(
         state.info["step"] > 500,
-        self.sample_command(cmd_rng),
+        self.sample_command(cmd_rng, data = data),
         state.info["command"],
     )
     state.info["step"] = jp.where(
@@ -344,7 +329,7 @@ class Joystick(joystick.Joystick):
     done = done.astype(reward.dtype)
     state = state.replace(data=data, obs=obs, reward=reward, done=done)
     return state
-
+  
   def _get_obs(
       self, data: mjx.Data, info: dict[str, Any], contact: jax.Array
   ) -> mjx_env.Observation:
@@ -397,16 +382,16 @@ class Joystick(joystick.Joystick):
         * self._config.noise_config.scales.linvel
     )
 
+    cmd = facet.global_to_local(info["command"], data, self.ids)
+
     state = jp.hstack([
         noisy_linvel,  # 3
         noisy_gyro,  # 3
         noisy_gravity,  # 3
-        info["command"],  # 3
+        cmd,  # 7
         noisy_joint_angles - self._default_pose,
         noisy_joint_vel,
         info["last_act"],
-        info["ft_dict"]["f"],
-        info["ft_dict"]["u"],
         phase,
     ])
 
@@ -435,7 +420,7 @@ class Joystick(joystick.Joystick):
         "state": state,
         "privileged_state": privileged_state,
     }
-
+  
   def _get_reward(
       self,
       data: mjx.Data,
@@ -447,11 +432,10 @@ class Joystick(joystick.Joystick):
       contact: jax.Array,
   ) -> dict[str, jax.Array]:
     del metrics  # Unused.
-    components = ft_ref.ctrl2components(data, action, self.ids)
     return {
         # Tracking rewards.
-        "tracking_lin_vel": self._reward_tracking_lin_vel(
-            info["command"], info["filtered_linvel"]
+        "tracking_lin": self._reward_tracking(
+            info
         ),
         "tracking_ang_vel": self._reward_tracking_ang_vel(
             info["command"], info["filtered_angvel"]
@@ -497,99 +481,29 @@ class Joystick(joystick.Joystick):
         "dof_pos_limits": self._cost_joint_pos_limits(data.qpos[7:]),
         "pose": self._cost_pose(data.qpos[7:]),
         "feet_distance": self._cost_feet_distance(data, info),
-        "pbc_w": self._cost_pbc_w(action, contact),
-        "maqp_cons": self._reward_maqp_cons(data, info, action),
-        "vel_def": self._reward_des_vel(components, info["command"]),
-        "vel_action_rate": self._cost_vel_action_rate(action, info["last_act"]),
     }
-    
-  def _cost_vel_action_rate(
-      self, act: jax.Array, last_act: jax.Array
+  
+  def _reward_tracking(
+      self, info: dict[str, Any]
   ) -> jax.Array:
-    vel_act = ctrl2logits(act, self.ids)["des_com_vel"]
-    angvel_act = ctrl2logits(act, self.ids)["des_com_angvel"]
-    vel_last_act = ctrl2logits(last_act, self.ids)["des_com_vel"]
-    angvel_last_act = ctrl2logits(last_act, self.ids)["des_com_angvel"]
-
-    c1 = jp.sum(jp.square(vel_act - 
-                          vel_last_act))
-    c2 = jp.sum(jp.square(angvel_act - 
-                          angvel_last_act))
-    return c1 + c2
+    xpos = info["kin_hist"][0, :3]
+    xvel = info["kin_hist"][0, 3:6]
+    windows = self.reference_traj.windows
+    rew_sum = 0.0
+    for i in range(windows.shape[0]):
+      x_ref = info["kin_hist"][0, 9 + 3*i:12 + 3*i]
+      x_dot_ref = info["kin_hist"][0, 9 + 3 * windows.shape[0] + 3*i:
+                           12 + 3 * windows.shape[0] + 3*i]
+      pos_mag = jp.sum(jp.square(xpos - x_ref))
+      vel_mag = jp.sum(jp.square(xvel - x_dot_ref))
+      pos_err_rew = jp.exp(
+        -pos_mag / 0.25
+      )
+      vel_err_rew = jp.exp(
+        -jp.sum(jp.square(xvel - x_dot_ref)) / 0.25
+      ) - 0.5 * vel_mag
+      rew_sum += pos_err_rew + vel_err_rew * 2.0
+    return rew_sum / windows.shape[0]
   
-  def _reward_des_vel(self, components, lin_vel):
-    des_vel_mag = jp.linalg.norm(components["des_com_vel"])
-    des_angvel_mag = jp.linalg.norm(components["des_com_angvel"])
-    des_vel_cap = 1.5
-    des_angvel_cap = 3.0
-    des_vel_rew = jp.clip(des_vel_mag - des_vel_cap,
-                           min = 0.0, max = None)
-    des_angvel_rew = jp.clip(des_angvel_mag - des_angvel_cap,
-                           min = 0.0, max = None)
-    rew_vel_lim = jp.exp(-(des_vel_rew + des_angvel_rew * 0.50))
-
-    # vel tracking reward
-
-    lin_vel_error = jp.sum(jp.square(lin_vel[:2] - components["des_com_vel"][:2]))
-    linvel_rew = jp.exp(-lin_vel_error / self._config.reward_config.tracking_sigma)
-
-    return rew_vel_lim * 0.1 + linvel_rew
-  
-  def _reward_maqp_cons(self, data, info, action):
-    debug_dict = info["ft_dict"]
-    f = debug_dict["f"]
-    l_true, r_true = get_forces(data, self.ids)
-    #f = get_frc_pbc(self._mjx_model, data, action)
-    #f = jp.zeros([24]) # Placeholder
-    lf = f[0:3]
-    rf = f[6:9]
-    fac = 20000
-    left_frc_error = jp.sum(jp.square(lf - l_true)) / fac
-    right_frc_error = jp.sum(jp.square(rf - r_true)) / fac
-    frc_error = left_frc_error + right_frc_error
-    frc_rew = jp.exp(-frc_error)
-
-    u = debug_dict["u"]
-    tau_limits = self.ids["tau_limits"]
-    torque_sum = jp.sum(jp.clip(jp.abs(tau_limits) - jp.abs(u), 
-                                None, 0.0))
-    torque_lim_rew = jp.exp(torque_sum / 50.0)
-
-    # foot torque penalty method
-
-    lt = jp.linalg.norm(f[3:6])
-    rt = jp.linalg.norm(f[9:12])
-
-    def foot_torque_penalty(tau):
-      t2 = jp.clip(tau - 6.0, 0.0, None)
-      return jp.exp(-t2 / 10.0)
-    
-    lt_rew = foot_torque_penalty(lt)
-    rt_rew = foot_torque_penalty(rt)
-    foot_torque_rew = (lt_rew + rt_rew) / 2.0
-
-    # maqp torque rate penalty
-
-    #u_action_rate = jp.sum(jp.square(u - info["last_u_act"]))
-    #u_action_rate *= -0.000005
-    #u_action_rate = jp.clip(u_action_rate, -0.30, 0.0)
-    info["last_u_act"] = u
-
-    total_rew = (torque_lim_rew * 0.30 + 
-                 frc_rew * 0.10 + 
-                 foot_torque_rew * 0.30)
-                 #u_action_rate * 1.0)
-
-    rew = jp.nan_to_num(total_rew, nan=-1.0, posinf=-1.0, neginf=-1.0)
-
-    return rew
-  
-  # Tracking rewards.
-
-  def _cost_pbc_w(self, action, contact):
-    logits = ctrl2logits(action, bids.ids)
-    return rewards.reward_pbc_w_leg_only(logits["w"], contact)
-  
-  @property
-  def action_size(self) -> int:
-    return ft_ref.default_act(self.ids).shape[0]
+  def halt_cmd(self, cmd):
+    return 0.0

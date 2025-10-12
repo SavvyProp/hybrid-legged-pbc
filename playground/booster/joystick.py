@@ -29,7 +29,23 @@ from mujoco_playground._src import mjx_env
 from mujoco_playground._src.locomotion.t1 import t1_constants as consts
 from playground.booster import base_pd as t1_base
 from rewards.mjx_col import get_contacts
-from playground.booster.base_pd import step
+from lowctrl import pd
+
+def step(
+    model: mjx.Model,
+    data: mjx.Data,
+    action: jax.Array,
+    n_substeps: int,
+    ids: Dict[str, Any],
+) -> mjx.Data:
+  def single_step(data, _):
+    ctrl = pd.step(model, data, action, ids)
+    data = data.replace(ctrl = ctrl)
+    data = mjx.step(model, data)
+    return data, None
+
+  return jax.lax.scan(single_step, data, (), n_substeps)[0]
+
 
 def default_config() -> config_dict.ConfigDict:
   return config_dict.create(
@@ -289,14 +305,6 @@ class Joystick(t1_base.T1Env):
       metrics[f"reward/{k}"] = jp.zeros(())
     metrics["swing_peak"] = jp.zeros(())
 
-    left_feet_contact = jp.array([
-        data.sensordata[self._mj_model.sensor_adr[sensorid]] > 0
-        for sensorid in self._left_foot_floor_found_sensor
-    ])
-    right_feet_contact = jp.array([
-        data.sensordata[self._mj_model.sensor_adr[sensorid]] > 0
-        for sensorid in self._right_foot_floor_found_sensor
-    ])
     #contact = jp.hstack([jp.any(left_feet_contact), jp.any(right_feet_contact)])
     contact = get_contacts(data.contact, self.ids)
 
@@ -329,7 +337,7 @@ class Joystick(t1_base.T1Env):
 
     motor_targets = action #self._default_pose + action * self._config.action_scale
     data = step(
-        self.mjx_model, state.data, motor_targets, self.n_substeps
+        self.mjx_model, state.data, motor_targets, self.n_substeps, self.ids
     )
     state.info["motor_targets"] = motor_targets
 
@@ -635,8 +643,7 @@ class Joystick(t1_base.T1Env):
       commands: jax.Array,
       qpos: jax.Array,
   ) -> jax.Array:
-    cmd_norm = jp.linalg.norm(commands)
-    return jp.sum(jp.abs(qpos - self._default_pose)) * (cmd_norm < 0.1)
+    return jp.sum(jp.abs(qpos - self._default_pose)) * self.halt_cmd(commands)
 
   def _cost_termination(self, done: jax.Array) -> jax.Array:
     return done
@@ -660,7 +667,7 @@ class Joystick(t1_base.T1Env):
     cost = jp.sum(
         jp.abs(qpos[self._hip_indices] - self._default_pose[self._hip_indices])
     )
-    cost *= jp.abs(cmd[1]) > 0.1
+    #cost *= jp.abs(cmd[1]) > 0.1
     return cost
 
   def _cost_joint_deviation_knee(self, qpos: jax.Array) -> jax.Array:
@@ -713,11 +720,12 @@ class Joystick(t1_base.T1Env):
       threshold_min: float = 0.2,
       threshold_max: float = 0.5,
   ) -> jax.Array:
-    cmd_norm = jp.linalg.norm(commands)
     air_time = (air_time - threshold_min) * first_contact
     air_time = jp.clip(air_time, max=threshold_max - threshold_min)
     reward = jp.sum(air_time)
-    reward *= cmd_norm > 0.1  # No reward for zero commands.
+    is_halt = self.halt_cmd(commands)
+    reward *= (1 - is_halt)
+    # reward *= cmd_norm > 0.1  # No reward for zero commands.
     return reward
 
   def _reward_feet_phase(
@@ -774,3 +782,8 @@ class Joystick(t1_base.T1Env):
         jp.zeros(3),
         jp.hstack([lin_vel_x, lin_vel_y, ang_vel_yaw]),
     )
+  
+  def halt_cmd(self, cmd):
+    # returns 1 if is halt, 0 otherwise
+    cmd_norm = jp.linalg.norm(cmd)
+    return  cmd_norm < 0.1
