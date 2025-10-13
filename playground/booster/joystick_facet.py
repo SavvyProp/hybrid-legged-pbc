@@ -39,7 +39,7 @@ def default_config() -> config_dict.ConfigDict:
       reward_config=config_dict.create(
           scales=config_dict.create(
               # Tracking related rewards.
-              tracking_lin=1.0,
+              tracking_lin=0.5,
               tracking_ang_vel=0.5,
               # Base related rewards.
               lin_vel_z=0.0,
@@ -550,7 +550,7 @@ class Joystick(joystick.Joystick):
       )
       vel_err_rew = jp.exp(
         -vel_mag / 0.25
-      ) - 0.5 * vel_mag
+      ) # - 0.5 * vel_mag
       rew_sum += pos_err_rew + vel_err_rew * 2.0
     return rew_sum / windows.shape[0]
   
