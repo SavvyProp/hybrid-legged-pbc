@@ -20,7 +20,7 @@ env = joystick.Joystick()
 
 jit_reset = jax.jit(env.reset)
 jit_step = jax.jit(env.step)
-state = jit_reset(jax.random.PRNGKey(0))
+state = jit_reset(jax.random.PRNGKey(69))
 
 def makeIFN():
     from brax.training.agents.ppo import networks as ppo_networks
@@ -48,7 +48,7 @@ def metrics_count(rew, metrics):
         rew += metrics[name]
     return rew
 
-dir = "training/pd_facet_1"
+dir = "training/pd_facet_3"
 
 model_path = dir + "/walk_policy"
 saved_params = model.load_params(model_path)
@@ -79,6 +79,7 @@ for c in range(1000):
     #nn_p, nn_d = raw_pd(raw_action)
     state = jit_step(state, ctrl)
     pipeline_state = state.data
+    state.info["force_traj"]["forces"] = jnp.zeros_like(state.info["force_traj"]["forces"])
     #rew = metrics_count(rew, state.metrics)
     #print(state.data.contact)
     #print(ids["col"])
@@ -109,8 +110,11 @@ while True:
         des_pos = state.info["command"][:3]
         current_pos = kin_hist[:3]
         x_ref_last = kin_hist[-3:]
+        xd_ref_first = kin_hist[9:12]
         x_acc = kin_hist[6:9]
         print(f"Des pos: {des_pos}, Current pos: {current_pos}, Last x_ref: {x_ref_last}, x_acc: {x_acc}")
+        print(f"Commands: {state.info['command']}  Metacmds: {state.info['metacommand']}")
+        print(f"First xd_ref: {xd_ref_first}")
         #print(state.info["phase"])
         #print(state.metrics)
         time.sleep(0.02)
