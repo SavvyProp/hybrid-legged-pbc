@@ -150,7 +150,8 @@ class Joystick(joystick.Joystick):
     phase = jp.array([0, jp.pi])
 
     rng, cmd_rng = jax.random.split(rng)
-    cmd = self.sample_command(cmd_rng)
+    metacmd = self.sample_metacommand(cmd_rng)
+    cmd = self.sample_command(metacmd)
 
     # Sample push interval.
 
@@ -160,6 +161,7 @@ class Joystick(joystick.Joystick):
     info = {
         "rng": rng,
         "step": 0,
+        "metacommand": metacmd,
         "command": cmd,
         "last_act": jp.zeros(self.action_size),
         "last_last_act": jp.zeros(self.action_size),
@@ -190,24 +192,26 @@ class Joystick(joystick.Joystick):
     reward, done = jp.zeros(2)
     return mjx_env.State(data, obs, reward, done, metrics, info)
   
-  def sample_command(self, rng: jax.Array, data = None) -> jax.Array:
+  def sample_metacommand(self, rng: jax.Array, data = None) -> jax.Array:
+    # sample a meta command which comes in the form of (glob pos), (current pos offset), (use offset), (kp, kd, m), angvel_yaw
     base_body_id = self.ids["base_id"]
     if data is None:
       base_pos = jp.zeros(3)
     else:
       base_pos = data.xpos[base_body_id]
-    rng1, rng2, rng3, rng4, rng5, rng6 = jax.random.split(rng, 6)
+    rng1, rng2, rng3, rng4, rng5, rng6, rng7, rng8, rng9 = jax.random.split(rng, 9)
 
-    t_exp = 2.0
+    t_exp = 5.0
 
-    lin_vel_x = jax.random.uniform(
+    lin_pos_x = jax.random.uniform(
         rng1, minval=self._config.lin_vel_x[0], maxval=self._config.lin_vel_x[1]
     )
-    lin_vel_y = jax.random.uniform(
+    lin_pos_y = jax.random.uniform(
         rng2, minval=self._config.lin_vel_y[0], maxval=self._config.lin_vel_y[1]
     )
-    z = 0.665
-    des_pos = base_pos[:2] + jp.array([lin_vel_x, lin_vel_y]) * t_exp
+    des_pos = base_pos[:2] + jp.array([lin_pos_x, lin_pos_y]) * t_exp
+
+
     ang_vel_yaw = jax.random.uniform(
         rng3,
         minval=self._config.ang_vel_yaw[0],
@@ -215,20 +219,61 @@ class Joystick(joystick.Joystick):
     )
 
     k_p = jax.random.uniform(rng4,
-                             minval=0.0,
-                             maxval=5.0)
-    k_d = 2 * jp.sqrt(k_p)
-    m = jax.random.uniform(rng6,
+                             minval=5.0,
+                             maxval=25.0)
+    k_d = 1.9 * jp.sqrt(k_p)
+    m = jax.random.uniform(rng7,
                            minval=0.8,
                            maxval=1.2) * self.ids["mass"]
 
-    # With 10% chance, set everything to zero.
-    return jp.where(
-        jax.random.bernoulli(rng4, p=0.1),
-        jp.hstack([base_pos[0], base_pos[1], z, 3.0, 0.5, m, 0.0]),
-        jp.hstack([des_pos[0], des_pos[1], z, k_p, k_d, m
-                   , ang_vel_yaw]),
+
+    lin_vel_x = jax.random.uniform(
+        rng5, minval=self._config.lin_vel_x[0], maxval=self._config.lin_vel_x[1]
     )
+    lin_vel_y = jax.random.uniform(
+        rng6, minval=self._config.lin_vel_y[0], maxval=self._config.lin_vel_y[1]
+    )
+    des_pos_offset = jp.array([lin_vel_x, lin_vel_y]) * k_d / k_p
+
+    # prob of pos command, vel command, or both zero
+
+    choice = jax.random.choice(rng8, 3, p=jp.array([0.4, 0.4, 0.2]))
+
+    metapos_pos = jp.hstack([des_pos, jp.array([0.0, 0.0, 0.0])])
+
+    metapos_vel = jp.hstack([jp.array([0.0, 0.0]), des_pos_offset, jp.array([1.0])])
+
+    metapos_zero = jp.hstack([jp.array([0.0, 0.0, 0.0, 0.0, 1.0])])
+
+    metapos = jp.where(choice == 0, metapos_pos, jp.where(choice == 1, metapos_vel, metapos_zero))
+
+    metacmd = jp.hstack([metapos, jp.array([k_p, k_d, m, ang_vel_yaw])])
+
+    return metacmd
+
+  
+  def sample_command(self, metacmd, data = None) -> jax.Array:
+    base_body_id = self.ids["base_id"]
+    if data is None:
+      base_pos = jp.zeros(3)
+    else:
+      base_pos = data.xpos[base_body_id]
+    
+    z = 0.665
+    des_pos = metacmd[:2]
+    des_pos_offset = metacmd[2:4]
+    use_offset = metacmd[4]
+
+    set_pos = des_pos + des_pos_offset + use_offset * base_pos[:2]
+
+    k_p = metacmd[5]
+    k_d = metacmd[6]
+    m = metacmd[7]
+    ang_vel_yaw = metacmd[8]
+
+    cmd = jp.hstack([set_pos, jp.array([z]), jp.array([k_p, k_d, m, ang_vel_yaw])])
+    
+    return cmd
   
   def apply_pushes(self, data: mjx.Data, info: dict[str, Any]):
     lin_force = self.force_traj_gen.get_force_at_time(
@@ -309,11 +354,12 @@ class Joystick(joystick.Joystick):
     state.info["last_last_act"] = state.info["last_act"]
     state.info["last_act"] = action
     state.info["rng"], cmd_rng = jax.random.split(state.info["rng"])
-    state.info["command"] = jp.where(
+    state.info["metacommand"] = jp.where(
         state.info["step"] > 500,
-        self.sample_command(cmd_rng, data = data),
-        state.info["command"],
+        self.sample_metacommand(cmd_rng, data = data),
+        state.info["metacommand"],
     )
+    state.info["command"] = self.sample_command(state.info["metacommand"], data = data)
     state.info["step"] = jp.where(
         done | (state.info["step"] > 500),
         0,
