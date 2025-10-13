@@ -11,8 +11,8 @@ class ForceTrajectory:
         self.durations_min = 0.40
         self.durations_max = 0.80
 
-        self.forces_min = jnp.array([80., 80., 0.])
-        self.forces_max = jnp.array([200., 200., 80.])
+        self.forces_min = jnp.array([20., 20., 0.])
+        self.forces_max = jnp.array([80., 80., 20.])
 
     def sample_force_traj(self, key):
 
