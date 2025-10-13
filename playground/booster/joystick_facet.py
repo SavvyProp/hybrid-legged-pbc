@@ -278,6 +278,9 @@ class Joystick(joystick.Joystick):
   def apply_pushes(self, data: mjx.Data, info: dict[str, Any]):
     lin_force = self.force_traj_gen.get_force_at_time(
         info["force_traj"], info["time"])
+    wrench = jp.hstack([lin_force, jp.zeros(3)])
+    xfrc = data.xfrc_applied.at[self.ids[""]].set(wrench)
+    data = data.replace(xfrc_applied=xfrc)
     return data, lin_force
   
   def update_kin_hist(self, data: mjx.Data, info: dict[str, Any], f_ext):
