@@ -152,6 +152,7 @@ ids = {
     "default_qpos": default_qpos,
     "max_vel": max_vel,
     "base_id": base_id,
+    "imu_id": model.site("imu").id,
     "col": {
         "left_foot": left_col,
         "right_foot": right_col,

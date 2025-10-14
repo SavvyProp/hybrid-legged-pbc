@@ -88,11 +88,13 @@ def global_to_local(cmds, data, ids):
     local_pos = data.xpos[base_body_ids]
     rotmat = data.xmat[base_body_ids].reshape(3, 3)
 
+    forward_vec = data.site_xmat[ids["imu_id"]].T @ jnp.array([1., 0, 0])
+
     local_pos = des_pos - local_pos
 
     local_pos_rot = rotmat.T @ local_pos
 
-    return jnp.concatenate([local_pos_rot, cmds[3:]], axis = 0)
+    return jnp.concatenate([local_pos, des_pos, forward_vec, cmds[3:]], axis = 0)
 
 # Track a rolling history of n timesteps of
 # real vel, real pos, and des acc
