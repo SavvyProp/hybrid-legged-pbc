@@ -115,10 +115,12 @@ while True:
         x_ref_last3 = kin_hist[-9:-6]
         xd_ref_first = kin_hist[9:12]
         x_acc = kin_hist[6:9]
+        obs = obs_list[c1]
         print(f"Des pos: {des_pos}, Current pos: {current_pos}, Last x_ref: {x_ref_last}, x_acc: {x_acc}")
         print(f"Last2: {x_ref_last2}, Last3: {x_ref_last3}")
         print(f"Commands: {state.info['command']}  Metacmds: {state.info['metacommand']}")
         print(f"Current Vel: {current_vel} First xd_ref: {xd_ref_first}")
+        print(f"Cmds {obs["state"][9:16]}")
         #print(state.info["phase"])
         #print(state.metrics)
         time.sleep(0.02)

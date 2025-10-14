@@ -219,8 +219,8 @@ class Joystick(joystick.Joystick):
     )
 
     k_p = jax.random.uniform(rng4,
-                             minval=5.0,
-                             maxval=25.0)
+                             minval=10.0,
+                             maxval=50.0)
     k_d = 1.9 * jp.sqrt(k_p)
     m = jax.random.uniform(rng7,
                            minval=0.8,
