@@ -85,12 +85,12 @@ def get_ddot_x_ref(cmds, x_real, x_dot_real, f_ext):
 def global_to_local(cmds, data, ids):
     base_body_ids = ids["base_id"]
     des_pos = cmds[:3]
-    local_pos = data.xpos[base_body_ids]
+    current_pos = data.xpos[base_body_ids]
     rotmat = data.xmat[base_body_ids].reshape(3, 3)
 
     forward_vec = data.site_xmat[ids["imu_id"]].T @ jnp.array([1., 0, 0])
 
-    local_pos = des_pos - local_pos
+    local_pos = des_pos - current_pos
 
     local_pos_rot = rotmat.T @ local_pos
 
