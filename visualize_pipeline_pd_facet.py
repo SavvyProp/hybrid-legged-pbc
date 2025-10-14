@@ -109,12 +109,16 @@ while True:
         kin_hist = state.info["kin_hist"][0, :]
         des_pos = state.info["command"][:3]
         current_pos = kin_hist[:3]
+        current_vel = kin_hist[3:6]
         x_ref_last = kin_hist[-3:]
+        x_ref_last2 = kin_hist[-6:-3]
+        x_ref_last3 = kin_hist[-9:-6]
         xd_ref_first = kin_hist[9:12]
         x_acc = kin_hist[6:9]
         print(f"Des pos: {des_pos}, Current pos: {current_pos}, Last x_ref: {x_ref_last}, x_acc: {x_acc}")
+        print(f"Last2: {x_ref_last2}, Last3: {x_ref_last3}")
         print(f"Commands: {state.info['command']}  Metacmds: {state.info['metacommand']}")
-        print(f"First xd_ref: {xd_ref_first}")
+        print(f"Current Vel: {current_vel} First xd_ref: {xd_ref_first}")
         #print(state.info["phase"])
         #print(state.metrics)
         time.sleep(0.02)
