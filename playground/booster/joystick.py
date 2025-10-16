@@ -29,6 +29,7 @@ from mujoco_playground._src import mjx_env
 from mujoco_playground._src.locomotion.t1 import t1_constants as consts
 from playground.booster import base_pd as t1_base
 from rewards.mjx_col import get_contacts
+from rewards import facet
 from lowctrl import pd
 
 def step(
@@ -135,6 +136,7 @@ class Joystick(t1_base.T1Env):
         config=config,
         config_overrides=config_overrides,
     )
+    self.force_traj_gen = facet.ForceTrajectory()
     self._post_init()
 
   def _post_init(self) -> None:
@@ -279,6 +281,9 @@ class Joystick(t1_base.T1Env):
     )
     push_interval_steps = jp.round(push_interval / self.dt).astype(jp.int32)
 
+    force_traj, rng = self.force_traj_gen.sample_force_traj(rng)
+    force_lin = jp.zeros(3)
+
     info = {
         "rng": rng,
         "step": 0,
@@ -296,8 +301,11 @@ class Joystick(t1_base.T1Env):
         "push": jp.array([0.0, 0.0]),
         "push_step": 0,
         "push_interval_steps": push_interval_steps,
+        "force_traj": force_traj,
+        "force_lin": force_lin,
         "filtered_linvel": jp.zeros(3),
         "filtered_angvel": jp.zeros(3),
+        "time": 0.0,
     }
 
     metrics = {}
@@ -311,26 +319,22 @@ class Joystick(t1_base.T1Env):
     obs = self._get_obs(data, info, contact)
     reward, done = jp.zeros(2)
     return mjx_env.State(data, obs, reward, done, metrics, info)
+  
+  def apply_pushes(self, data: mjx.Data, info: dict[str, Any]):
+    lin_force = self.force_traj_gen.get_force_at_time(
+        info["force_traj"], info["time"])
+    wrench = jp.hstack([lin_force, jp.zeros(3)])
+    xfrc = data.xfrc_applied.at[self.ids["base_id"]].set(wrench)
+    data = data.replace(xfrc_applied=xfrc)
+    return data, lin_force
 
   def step(self, state: mjx_env.State, action: jax.Array) -> mjx_env.State:
     state.info["rng"], push1_rng, push2_rng = jax.random.split(
         state.info["rng"], 3
     )
-    push_theta = jax.random.uniform(push1_rng, maxval=2 * jp.pi)
-    push_magnitude = jax.random.uniform(
-        push2_rng,
-        minval=self._config.push_config.magnitude_range[0],
-        maxval=self._config.push_config.magnitude_range[1],
-    )
-    push = jp.array([jp.cos(push_theta), jp.sin(push_theta)])
-    push *= (
-        jp.mod(state.info["push_step"] + 1, state.info["push_interval_steps"])
-        == 0
-    )
-    push *= self._config.push_config.enable
-    qvel = state.data.qvel
-    qvel = qvel.at[:2].set(push * push_magnitude + qvel[:2])
-    data = state.data.replace(qvel=qvel)
+    
+    data, lin_force = self.apply_pushes(state.data, state.info)
+    state.info["force_lin"] = lin_force
     state = state.replace(data=data)
 
     # state = self._reset_if_outside_bounds(state)
@@ -379,7 +383,7 @@ class Joystick(t1_base.T1Env):
     }
     reward = jp.clip(sum(rewards.values()) * self.dt, 0.0, 10000.0)
 
-    state.info["push"] = push
+    state.info["time"] += self.dt
     state.info["step"] += 1
     state.info["push_step"] += 1
     phase_tp1 = state.info["phase"] + state.info["phase_dt"]

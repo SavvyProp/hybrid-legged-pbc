@@ -14,9 +14,11 @@ class ForceTrajectory:
         self.forces_min = jnp.array([0., 0., 0.])
         self.forces_max = jnp.array([20., 20., 5.])
 
+        self.impulse_frc_max = jnp.array([300., 300., 100.])
+
     def sample_force_traj(self, key):
 
-        key_force, key_sign, key_dur, key2 = jax.random.split(key, 4)
+        key_force, key_sign, key_dur, key1, key2 = jax.random.split(key, 5)
 
         forces = jax.random.uniform(key_force, 
                                     shape = (self.samples, 3),
@@ -30,6 +32,13 @@ class ForceTrajectory:
                                        shape = (self.samples,),
                                        minval = self.durations_min,
                                        maxval = self.durations_max)
+        
+        impulse_desc = jax.random.bernoulli(key1, p = 0.2, shape = (self.samples, 1))
+
+        durations = jnp.where(impulse_desc, 0.04, durations)
+
+        fac = self.impulse_frc_max[0] / self.forces_max[0]
+        forces = jnp.where(impulse_desc, forces * fac, forces)
         # End timestamps (inclusive end of each segment)
         timestamps = jnp.cumsum(durations)
         total_time = timestamps[-1]

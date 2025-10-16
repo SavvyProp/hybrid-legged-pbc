@@ -210,6 +210,10 @@ class Joystick(joystick.Joystick):
                            is_mjx=True, debug=True)
     for key in debug_dict:
       debug_dict[key] = jp.zeros_like(debug_dict[key])
+
+    force_traj, rng = self.force_traj_gen.sample_force_traj(rng)
+    force_lin = jp.zeros(3)
+
     info = {
         "rng": rng,
         "step": 0,
@@ -231,8 +235,11 @@ class Joystick(joystick.Joystick):
         "push_interval_steps": push_interval_steps,
         "filtered_linvel": jp.zeros(3),
         "filtered_angvel": jp.zeros(3),
+        "force_traj": force_traj,
+        "force_lin": force_lin,
         "filt_state": ft_ref.make_filt_state(self.ids),
         "ft_dict": debug_dict,
+        "time": 0.0,
     }
 
     metrics = {}
@@ -248,26 +255,10 @@ class Joystick(joystick.Joystick):
     return mjx_env.State(data, obs, reward, done, metrics, info)
 
   def step(self, state: mjx_env.State, action: jax.Array) -> mjx_env.State:
-    state.info["rng"], push1_rng, push2_rng = jax.random.split(
-        state.info["rng"], 3
-    )
-    push_theta = jax.random.uniform(push1_rng, maxval=2 * jp.pi)
-    push_magnitude = jax.random.uniform(
-        push2_rng,
-        minval=self._config.push_config.magnitude_range[0],
-        maxval=self._config.push_config.magnitude_range[1],
-    )
-    push = jp.array([jp.cos(push_theta), jp.sin(push_theta)])
-    push *= (
-        jp.mod(state.info["push_step"] + 1, state.info["push_interval_steps"])
-        == 0
-    )
-    push *= self._config.push_config.enable
-    qvel = state.data.qvel
-    qvel = qvel.at[:2].set(push * push_magnitude + qvel[:2])
-    data = state.data.replace(qvel=qvel)
-    state = state.replace(data=data)
 
+    data, lin_force = self.apply_pushes(state.data, state.info)
+    state.info["force_lin"] = lin_force
+    state = state.replace(data=data)
     # state = self._reset_if_outside_bounds(state)
 
     motor_targets = action #self._default_pose + action * self._config.action_scale
@@ -311,7 +302,8 @@ class Joystick(joystick.Joystick):
     state.info["ft_dict"] = ft_ref.step(self._mjx_model, 
                            data, action, self.ids, 
                            is_mjx=True, debug=True)
-    state.info["push"] = push
+    
+    state.info["time"] += self.dt
     state.info["step"] += 1
     state.info["push_step"] += 1
     phase_tp1 = state.info["phase"] + state.info["phase_dt"]
@@ -429,6 +421,7 @@ class Joystick(joystick.Joystick):
         contact,  # 2
         feet_vel,  # 4*3
         info["feet_air_time"],  # 2
+        info["force_lin"], # 3
     ])
 
     return {

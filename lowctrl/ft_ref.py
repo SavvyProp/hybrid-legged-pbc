@@ -143,12 +143,17 @@ def ctrl2logits(act, ids):
     w = act[ids["ctrl_num"] + 6 : ids["ctrl_num"] + ids["eef_num"] + 6]
     torque = act[ids["ctrl_num"] + ids["eef_num"] + 6:
               ids["ctrl_num"] * 2 + ids["eef_num"] + 6]
+    body_ff_acc = act[ids["ctrl_num"] * 2 + ids["eef_num"] + 6:
+                        ids["ctrl_num"] * 2 + ids["eef_num"] + 12]
+    d_gain = act[-2:]
     logits = {
         "des_pos": des_pos,
         "des_com_vel": des_com_vel,
         "des_com_angvel": des_com_angvel,
         "w": w,
-        "torque": torque
+        "torque": torque,
+        "body_ff_acc": body_ff_acc,
+        "d_gain": d_gain
     }
     return logits
 
@@ -175,25 +180,35 @@ def ctrl2components(data, act, ids):
     sign = jnp.where(qvel * torque_logit >= 0, 1.0, 0.0)
     tau = tau_naive * (1.0 - spd_fac * sign)
 
+    body_ff_lin_acc = jnp.tanh(logits["body_ff_acc"][0:3]) * 2.0
+    body_ff_ang_acc = jnp.tanh(logits["body_ff_acc"][3:6]) * 0.4
+
+    d_gain_lin = jnp.tanh(logits["d_gain"][0]) * 1.5 + 2.0
+    d_gain_angvel = jnp.tanh(logits["d_gain"][1]) * 0.05 + 0.07
+
     outputs = {
         "des_pos": des_pos,
         "des_com_vel": des_com_vel,
         "des_com_angvel": des_angvel,
         "w": w,
-        "torque": tau
+        "torque": tau,
+        "body_ff_lin_acc": body_ff_lin_acc,
+        "body_ff_ang_acc": body_ff_ang_acc,
+        "d_gain_lin": d_gain_lin,
+        "d_gain_angvel": d_gain_angvel
     }
     return outputs
 
-def highlvlPD(data, com_vel, des_com_vel, des_angvel, ids):
+def highlvlPD(data, com_vel, des_com_vel, des_angvel, lin_gain, ang_gain, ids):
     qvel = data.qvel[ids["joint_vel_ids"]]
     #com_vel = qvel[0:3]
 
     world_com_vel = lmath.rotate_des_com_vel(des_com_vel, data)
     
-    c_lin_p_gain = 3.0
+    c_lin_p_gain = lin_gain
     com_acc = c_lin_p_gain * (world_com_vel - com_vel)
     
-    c_ang_p_gain = 0.10
+    c_ang_p_gain = ang_gain
     com_angacc = c_ang_p_gain * (des_angvel - qvel[3:6])
 
     com_accs = jnp.concatenate([com_acc, com_angacc], axis = 0)
@@ -208,6 +223,10 @@ def step(model, data, act, ids, is_mjx = False,
     des_angvel = output["des_com_angvel"]
     w = output["w"]
     tau = output["torque"]
+    d_lin_gain = output["d_gain_lin"]
+    d_ang_gain = output["d_gain_angvel"]
+
+    ff_acc = jnp.concatenate([output["body_ff_lin_acc"], output["body_ff_ang_acc"]], axis = 0)
     
     p_weight = ids["p_gains"]
     d_weight = ids["d_gains"]
@@ -218,7 +237,10 @@ def step(model, data, act, ids, is_mjx = False,
     jacs, eefpos, com_pos, com_vel, h = lmodel.jac_only_kin_values(model, data, ids, is_mjx = is_mjx)
     #com_vel = data.qvel[ids["joint_vel_ids"]][0:3]
     
-    com_accs, world_com_vel = highlvlPD(data, com_vel, des_com_vel, des_angvel, ids)
+    com_accs, world_com_vel = highlvlPD(data, com_vel, des_com_vel, des_angvel,
+                                        d_lin_gain, d_ang_gain, ids)
+    
+    com_accs = com_accs - ff_acc
     
     #s = jnp.where(nn.sigmoid(w) > 0.5, 1.0, 0.0)
     u_ff, f, norm_dict = ft_ref(
@@ -283,7 +305,8 @@ def default_act(ids):
     des_com_angvel = jnp.zeros([3])
     w = jnp.array([10., 10., -5., -5.])
     frc = jnp.zeros([ids["ctrl_num"]])
-    act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w, frc], axis = 0)
+    ff_gains = jnp.zeros([8])
+    act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w, frc, ff_gains], axis = 0)
     return act
 
 def default_act_lock_com(com_pos, data, ids):
@@ -369,7 +392,8 @@ def raise_right_leg(com_pos, data, t, tmax, ids):
 
     frc = jnp.zeros([ids["ctrl_num"]])
 
-    act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w, frc], axis = 0)
+    ff_gains = jnp.zeros([8])
+    act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w, frc, ff_gains], axis = 0)
     
     com_pos = com_pos + jnp.array([0.0, 0.05, 0.0])
     current_com = data.subtree_com[0]
