@@ -33,7 +33,7 @@ class ForceTrajectory:
                                        minval = self.durations_min,
                                        maxval = self.durations_max)
         
-        impulse_desc = jax.random.bernoulli(key1, p = 0.2, shape = (self.samples, 1))
+        impulse_desc = jax.random.bernoulli(key1, p = 0.02, shape = (self.samples, 1))
 
         durations = jnp.where(impulse_desc, 0.04, durations)
 
