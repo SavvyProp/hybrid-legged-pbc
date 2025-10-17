@@ -178,7 +178,7 @@ def ctrl2components(data, act, ids):
     tau = tau_naive * (1.0 - spd_fac * sign)
 
 
-    d_gain_lin = jnp.tanh(logits["d_gain"][0]) * 1.5 + 2.0
+    d_gain_lin = jnp.tanh(logits["d_gain"][0]) * 3.0 + 4.0
     d_gain_angvel = jnp.tanh(logits["d_gain"][1]) * 0.05 + 0.07
 
     outputs = {

@@ -47,7 +47,7 @@ def test_force(type):
     if type == "pd":
         model_path = "training/pd_3/walk_policy"
     else:
-        model_path = "training/ftk/walk_policy"
+        model_path = "training/ftk2/walk_policy"
 
     saved_params = model.load_params(model_path)
 
@@ -106,7 +106,7 @@ def test_force(type):
                 alive = sim_loop(state, frc, jax.random.PRNGKey(64 + c))
                 success_rate[i] += alive[-1]
                 success_data[i, c] = alive[-1]
-            print(f"Force {frc_x[i]} N, Trial {c}, Alive: {alive[-1]}")
+                print(f"Force {frc_x[i]} N, Trial {c}, Alive: {alive[-1]}")
 
     success_rate = success_rate / 16.0
 
