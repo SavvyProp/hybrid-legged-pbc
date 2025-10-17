@@ -143,8 +143,6 @@ def ctrl2logits(act, ids):
     w = act[ids["ctrl_num"] + 6 : ids["ctrl_num"] + ids["eef_num"] + 6]
     torque = act[ids["ctrl_num"] + ids["eef_num"] + 6:
               ids["ctrl_num"] * 2 + ids["eef_num"] + 6]
-    body_ff_acc = act[ids["ctrl_num"] * 2 + ids["eef_num"] + 6:
-                        ids["ctrl_num"] * 2 + ids["eef_num"] + 12]
     d_gain = act[-2:]
     logits = {
         "des_pos": des_pos,
@@ -152,7 +150,6 @@ def ctrl2logits(act, ids):
         "des_com_angvel": des_com_angvel,
         "w": w,
         "torque": torque,
-        "body_ff_acc": body_ff_acc,
         "d_gain": d_gain
     }
     return logits
@@ -180,8 +177,6 @@ def ctrl2components(data, act, ids):
     sign = jnp.where(qvel * torque_logit >= 0, 1.0, 0.0)
     tau = tau_naive * (1.0 - spd_fac * sign)
 
-    body_ff_lin_acc = jnp.tanh(logits["body_ff_acc"][0:3]) * 2.0
-    body_ff_ang_acc = jnp.tanh(logits["body_ff_acc"][3:6]) * 0.4
 
     d_gain_lin = jnp.tanh(logits["d_gain"][0]) * 1.5 + 2.0
     d_gain_angvel = jnp.tanh(logits["d_gain"][1]) * 0.05 + 0.07
@@ -192,8 +187,6 @@ def ctrl2components(data, act, ids):
         "des_com_angvel": des_angvel,
         "w": w,
         "torque": tau,
-        "body_ff_lin_acc": body_ff_lin_acc,
-        "body_ff_ang_acc": body_ff_ang_acc,
         "d_gain_lin": d_gain_lin,
         "d_gain_angvel": d_gain_angvel
     }
@@ -226,8 +219,6 @@ def step(model, data, act, ids, is_mjx = False,
     d_lin_gain = output["d_gain_lin"]
     d_ang_gain = output["d_gain_angvel"]
 
-    ff_acc = jnp.concatenate([output["body_ff_lin_acc"], output["body_ff_ang_acc"]], axis = 0)
-    
     p_weight = ids["p_gains"]
     d_weight = ids["d_gains"]
 
@@ -240,7 +231,7 @@ def step(model, data, act, ids, is_mjx = False,
     com_accs, world_com_vel = highlvlPD(data, com_vel, des_com_vel, des_angvel,
                                         d_lin_gain, d_ang_gain, ids)
     
-    com_accs = com_accs - ff_acc
+    com_accs = com_accs
     
     #s = jnp.where(nn.sigmoid(w) > 0.5, 1.0, 0.0)
     u_ff, f, norm_dict = ft_ref(
@@ -305,7 +296,7 @@ def default_act(ids):
     des_com_angvel = jnp.zeros([3])
     w = jnp.array([10., 10., -5., -5.])
     frc = jnp.zeros([ids["ctrl_num"]])
-    ff_gains = jnp.zeros([8])
+    ff_gains = jnp.zeros([2])
     act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w, frc, ff_gains], axis = 0)
     return act
 
@@ -392,7 +383,7 @@ def raise_right_leg(com_pos, data, t, tmax, ids):
 
     frc = jnp.zeros([ids["ctrl_num"]])
 
-    ff_gains = jnp.zeros([8])
+    ff_gains = jnp.zeros([2])
     act = jnp.concatenate([des_pos, des_com_vel, des_com_angvel, w, frc, ff_gains], axis = 0)
     
     com_pos = com_pos + jnp.array([0.0, 0.05, 0.0])

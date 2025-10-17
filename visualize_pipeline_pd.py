@@ -48,7 +48,7 @@ def metrics_count(rew, metrics):
         rew += metrics[name]
     return rew
 
-dir = "training/pd_2"
+dir = "training/pd_3"
 
 model_path = dir + "/walk_policy"
 saved_params = model.load_params(model_path)
