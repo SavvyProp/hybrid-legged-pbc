@@ -47,7 +47,7 @@ def test_force(type):
     if type == "pd":
         model_path = "training/pd_3/walk_policy"
     else:
-        model_path = "training/ft_ext/walk_policy"
+        model_path = "training/ftk/walk_policy"
 
     saved_params = model.load_params(model_path)
 
@@ -95,13 +95,17 @@ def test_force(type):
 
     # Force range from 200 N to 1000 N in steps of 50 N
     frc_x = np.arange(200., 1000., 50.)
+    success_data = np.zeros([16, 16])
     for i in range(16):
         for c in range(16):
             state = jit_reset(jax.random.PRNGKey(c))
             frc = jnp.array([frc_x[i], 0., 0.])
-            alive = sim_loop(state, frc, jax.random.PRNGKey(64 + c))
-            success_rate[i] += alive[-1]
-
+            if i != 0 and success_data[i-1, c] == 0:
+                print(f"Force {frc_x[i]} N, Trial {c}, Skipped due to previous failure")
+            else:
+                alive = sim_loop(state, frc, jax.random.PRNGKey(64 + c))
+                success_rate[i] += alive[-1]
+                success_data[i, c] = alive[-1]
             print(f"Force {frc_x[i]} N, Trial {c}, Alive: {alive[-1]}")
 
     success_rate = success_rate / 16.0

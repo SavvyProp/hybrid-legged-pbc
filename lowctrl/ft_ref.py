@@ -245,7 +245,7 @@ def step(model, data, act, ids, is_mjx = False,
 
     torque_fac = jnp.clip(jnp.abs(u_ff) / (ids["tau_limits"] + 1e-6), 0.0, 1.0)
 
-    p_weight = p_weight * (1.0 - torque_fac * 0.5)
+    #p_weight = p_weight * (1.0 - torque_fac * 0.5)
 
     pd_tau = p_weight * (des_pos - qpos)
 
