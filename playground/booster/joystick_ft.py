@@ -526,7 +526,7 @@ class Joystick(joystick.Joystick):
     lin_vel_error = jp.sum(jp.square(lin_vel[:2] - components["des_com_vel"][:2]))
     linvel_rew = jp.exp(-lin_vel_error / self._config.reward_config.tracking_sigma)
 
-    return rew_vel_lim * 0.1 + linvel_rew
+    return rew_vel_lim * 0.1 # + linvel_rew
   
   def _reward_maqp_cons(self, data, info, action):
     debug_dict = info["ft_dict"]

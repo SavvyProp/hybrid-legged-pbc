@@ -47,7 +47,7 @@ def test_force(type):
     if type == "pd":
         model_path = "training/pd_3/walk_policy"
     else:
-        model_path = "training/ft_ext/walk_policy"
+        model_path = "training/ftk3/walk_policy"
 
     saved_params = model.load_params(model_path)
 
@@ -55,48 +55,42 @@ def test_force(type):
     jit_inference_fn = jax.jit(inference_fn)
 
     def get_alive_duration(metrics):
-        if jnp.abs(metrics["reward/termination"]) < 0.01:
-            return 1
-        else:
-            return 0
+        return jnp.where(jnp.abs(metrics["reward/termination"]) < 0.01, 1, 0)
         
-    def apply_frc(state, frc):
-        force_traj = state.info["force_traj"]["forces"]
-        height = force_traj.shape[0]
-        new_force_traj = jnp.tile(frc[None, :], (height, 1))
-        state.info["force_traj"]["forces"] = new_force_traj
-        return state
-
+    def batched_sim_loop(states, rngs):
+        def single_sim_loop(state, rng):
+            def apply_frc_and_step(carry, c):
+                state, rng = carry
+                act_rng, rng = jax.random.split(rng)
+                
+                ctrl, _ = jit_inference_fn(state.obs, act_rng)
+                
+                # Apply force directly in the loop
+                frc = jnp.array([c * 0.1, 0., 0.])
+                force_traj = state.info["force_traj"]["forces"]
+                height = force_traj.shape[0]
+                new_force_traj = jnp.tile(frc[None, :], (height, 1))
+                state.info["force_traj"]["forces"] = new_force_traj
+                state = jit_step(state, ctrl)
+                alive = get_alive_duration(state.metrics)
+                
+                return (state, rng), alive
+            
+            (_, _), alive_array = jax.lax.scan(apply_frc_and_step, (state, rng), jnp.arange(1000))
+            return alive_array
         
-    def sim_loop(state, rng):
-        ctrl_list = []
-        obs_list = []
-        pipeline_state_list = []
-        states = []
-        alive = []
-        
-        for c in range(1000):
-            act_rng, rng = jax.random.split(rng)
-            obs_list += [state.obs]
-            ctrl, _ = jit_inference_fn(state.obs, act_rng)
-
-            frc = jnp.array([c * 0.1, 0., 0.])
-            state = apply_frc(state, frc)
-
-            state = jit_step(state, ctrl)
-            pipeline_state = state.data
-            alive += [get_alive_duration(state.metrics)]
-            ctrl_list += [ctrl]
-            states += [state]
-            pipeline_state_list += [pipeline_state]
-        return alive
+        return jax.vmap(single_sim_loop)(states, rngs)
     
-    num_alive = np.zeros(1000)
+    # Batch reset and simulation
+    batch_size = 32
+    reset_keys = jax.random.split(jax.random.PRNGKey(0), batch_size)
+    sim_keys = jax.random.split(jax.random.PRNGKey(64), batch_size)
     
-    for c in range(32):
-        state = jit_reset(jax.random.PRNGKey(c))
-        alive = sim_loop(state, jax.random.PRNGKey(64 + c))
-        num_alive += np.array(alive)
+    initial_states = jax.vmap(jit_reset)(reset_keys)
+    all_alive = batched_sim_loop(initial_states, sim_keys)
+    
+    # Sum across all batches
+    num_alive = jnp.sum(all_alive, axis=0)
 
-    np.savetxt(f"data/eval/{type}_constant_frc_alive.csv", num_alive.reshape(-1, 1), delimiter=",")
+    np.savetxt(f"data/eval/{type}_constant_frc_alive.csv", np.array(num_alive).reshape(-1, 1), delimiter=",")
 
