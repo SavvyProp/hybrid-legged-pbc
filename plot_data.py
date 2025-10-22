@@ -327,6 +327,12 @@ def main():
                              ylabel='torque (Nm)',
                              save_path=os.path.join('data', 'u_pd_tau_cols_11_16.png'))
     
+    plot_cols_11_16_overlaid(tau[range_lower:range_upper, :], 
+                             u[range_lower:range_upper, :], 
+                             legend=['u_ref', 'u_ff'],
+                             ylabel='torque (Nm)',
+                             save_path=os.path.join('data', 'u_ff_tau_cols_11_16.png'))
+    
     plot_cols_11_16_overlaid(des_pos[range_lower:range_upper, :], 
                              real_pos[range_lower:range_upper, :], 
                              legend=['des_pos', 'real_pos'],

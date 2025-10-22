@@ -161,5 +161,6 @@ ids = {
     "dummy_joints": dummy_joints,
     "mass": mass,
     "angular_inertia": angular_inertia,
-    "g": 9.81
+    "g": 9.81,
+    "num_bodies": 23
 }

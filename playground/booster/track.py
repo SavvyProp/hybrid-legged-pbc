@@ -1,0 +1,538 @@
+# Copyright 2025 DeepMind Technologies Limited
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+"""Joystick task for Booster T1."""
+
+from typing import Any, Dict, Optional, Union
+
+import jax
+import jax.numpy as jp
+from ml_collections import config_dict
+from mujoco import mjx
+from mujoco.mjx._src import math
+import numpy as np
+
+from mujoco_playground._src import gait
+from mujoco_playground._src import mjx_env
+#from mujoco_playground._src.locomotion.t1 import base as t1_base
+from mujoco_playground._src.locomotion.t1 import t1_constants as consts
+from playground.booster import base_pd as t1_base
+from rewards.mjx_col import get_contacts
+from rewards import facet
+from lowctrl import pd
+from motion_retarget import motion_retarget
+from rewards import rot
+
+def step(
+    model: mjx.Model,
+    data: mjx.Data,
+    action: jax.Array,
+    n_substeps: int,
+    ids: Dict[str, Any],
+) -> mjx.Data:
+  def single_step(data, _):
+    ctrl = pd.step(model, data, action, ids)
+    data = data.replace(ctrl = ctrl)
+    data = mjx.step(model, data)
+    return data, None
+
+  return jax.lax.scan(single_step, data, (), n_substeps)[0]
+
+
+def default_config() -> config_dict.ConfigDict:
+  return config_dict.create(
+      ctrl_dt=0.02,
+      sim_dt=0.001,
+      episode_length=1000,
+      action_repeat=1,
+      action_scale=1.0,
+      history_len=1,
+      soft_joint_pos_limit_factor=0.95,
+      noise_config=config_dict.create(
+          level=1.0,  # Set to 0.0 to disable noise.
+          scales=config_dict.create(
+              joint_pos=0.03,
+              joint_vel=1.5,
+              gravity=0.05,
+              linvel=0.1,
+              gyro=0.2,
+          ),
+      ),
+      reward_config=config_dict.create(
+          scales=config_dict.create(
+              # base pose
+              base_pos = 0.5,
+              base_quat = 0.5,
+              # body pos
+              body_pos = 1.0,
+              body_orien = 1.0,
+              # body linvel
+              body_linvel = 1.0,
+              body_angvel = 1.0,
+              # action rate
+              action_rate = -1e-1,
+              # Termination
+              termination=-100.0,
+              # Pose related rewards.
+              collision=-1.0,
+          ),
+          pos_sigma=0.3,
+          ang_sigma=0.4,
+          linvel_sigma=1.0,
+          angvel_sigma=3.14
+      ),
+      push_config=config_dict.create(
+          enable=True,
+          interval_range=[5.0, 10.0],
+          magnitude_range=[0.1, 1.0],
+      ),
+      lin_vel_x=[-1.0, 1.0],
+      lin_vel_y=[-0.8, 0.8],
+      ang_vel_yaw=[-1.0, 1.0],
+      impl="jax",
+      nconmax=8 * 8192,
+      njmax=80,
+  )
+
+def parse_motion(task, num_bodies, num_joints):
+  
+  task_array = np.genfromtxt(f"motions/{task}.csv", delimiter=",")
+  body_poses = task_array[:, :num_bodies * 7].reshape(-1, num_bodies, 7)
+  body_vels = task_array[:, num_bodies * 7: 
+                         num_bodies * 7 + (num_bodies + 2 ) * 6].reshape(-1, num_bodies + 2, 6)
+  qpos = task_array[:, num_bodies * 7 + (num_bodies + 2 ) * 6:-num_joints - 6]
+  qvel = task_array[:, -num_joints - 6:]
+  body_poses = jp.array(body_poses)
+  body_vels = jp.array(body_vels)
+  qpos = jp.array(qpos)
+  qvel = jp.array(qvel)
+
+  return body_poses, body_vels, qpos, qvel
+  
+
+class Track(t1_base.T1Env):
+  """Track a joystick command."""
+
+  def __init__(
+      self,
+      task: str = "CMU_02_05",
+      config: config_dict.ConfigDict = default_config(),
+      config_overrides: Optional[Dict[str, Union[str, int, list[Any]]]] = None,
+  ):
+    super().__init__(
+        config=config,
+        config_overrides=config_overrides,
+    )
+    self.task = task
+    self.force_traj_gen = facet.ForceTrajectory()
+    self._post_init()
+
+  def override_config(self, config):
+    config.episode_length = self.traj_length
+    return config
+
+  def _post_init(self) -> None:
+    self.body_poses, self.body_vels, self.qpos_traj, self.qvel_traj = parse_motion(self.task, 
+                                                                   self.ids["num_bodies"],
+                                                                   self.ids["ctrl_num"])
+    self.traj_length = self.qpos_traj.shape[0]
+    #self._init_q = jp.array(self._mj_model.keyframe("home").qpos)
+    # Take self._init_q from first frame of qpos_traj
+    self._init_q = self.qpos_traj[0, :]
+    self._init_q = self._init_q.at[2].add(0.07)
+    
+    self._default_pose = jp.array(self._mj_model.keyframe("home").qpos[7:])
+
+    # Note: First joint is freejoint.
+    self._lowers, self._uppers = self.mj_model.jnt_range[1:].T
+    c = (self._lowers + self._uppers) / 2
+    r = self._uppers - self._lowers
+    self._soft_lowers = c - 0.5 * r * self._config.soft_joint_pos_limit_factor
+    self._soft_uppers = c + 0.5 * r * self._config.soft_joint_pos_limit_factor
+
+    hip_indices = []
+    hip_joint_names = ["Hip_Roll", "Hip_Yaw"]
+    for side in ["Left", "Right"]:
+      for joint_name in hip_joint_names:
+        hip_indices.append(
+            self._mj_model.joint(f"{side}_{joint_name}").qposadr - 7
+        )
+    self._hip_indices = jp.array(hip_indices)
+
+    knee_indices = []
+    for side in ["Left", "Right"]:
+      knee_indices.append(
+          self._mj_model.joint(f"{side}_Knee_Pitch").qposadr - 7
+      )
+    self._knee_indices = jp.array(knee_indices)
+
+    # fmt: off
+    self._weights = jp.array([
+        1.0, 1.0,  # Head.
+        0.1, 1.0, 1.0, 1.0,  # Left arm.
+        0.1, 1.0, 1.0, 1.0,  # Right arm.
+        1.0,  # Waist.
+        0.01, 1.0, 1.0, 0.01, 1.0, 1.0,  # Left leg.
+        0.01, 1.0, 1.0, 0.01, 1.0, 1.0,  # Right leg.
+    ])
+    # fmt: on
+
+    self._torso_body_id = self._mj_model.body(consts.ROOT_BODY).id
+    self._torso_mass = self._mj_model.body_subtreemass[self._torso_body_id]
+    self._site_id = self._mj_model.site("imu").id
+
+    self._feet_site_id = np.array(
+        [self._mj_model.site(name).id for name in consts.FEET_SITES]
+    )
+    self._floor_geom_id = self._mj_model.geom("floor").id
+    self._left_feet_geom_id = np.array(
+        [self._mj_model.geom(name).id for name in consts.LEFT_FEET_GEOMS]
+    )
+    self._right_feet_geom_id = np.array(
+        [self._mj_model.geom(name).id for name in consts.RIGHT_FEET_GEOMS]
+    )
+
+    foot_linvel_sensor_adr = []
+    for site in consts.FEET_SITES:
+      sensor_id = self._mj_model.sensor(f"{site}_global_linvel").id
+      sensor_adr = self._mj_model.sensor_adr[sensor_id]
+      sensor_dim = self._mj_model.sensor_dim[sensor_id]
+      foot_linvel_sensor_adr.append(
+          list(range(sensor_adr, sensor_adr + sensor_dim))
+      )
+    self._foot_linvel_sensor_adr = jp.array(foot_linvel_sensor_adr)
+
+    self._left_foot_box_geom_id = self._mj_model.geom("left_foot").id
+    self._right_foot_box_geom_id = self._mj_model.geom("right_foot").id
+
+    # Contact sensor IDs.
+    self._left_foot_floor_found_sensor = [
+        self._mj_model.sensor(f"left_foot_{i}_floor_found").id
+        for i in range(1, 5)
+    ]
+    self._right_foot_floor_found_sensor = [
+        self._mj_model.sensor(f"right_foot_{i}_floor_found").id
+        for i in range(1, 5)
+    ]
+    self._left_foot_right_foot_found_sensor = self._mj_model.sensor(
+        "left_foot_right_foot_found"
+    ).id
+
+  def _reset_if_outside_bounds(self, state: mjx_env.State) -> mjx_env.State:
+    qpos = state.data.qpos
+    new_x = jp.where(jp.abs(qpos[0]) > 9.5, 0.0, qpos[0])
+    new_y = jp.where(jp.abs(qpos[1]) > 9.5, 0.0, qpos[1])
+    qpos = qpos.at[0:2].set(jp.array([new_x, new_y]))
+    state = state.replace(data=state.data.replace(qpos=qpos))
+    return state
+
+  def reset(self, rng: jax.Array) -> mjx_env.State:
+    qpos = self._init_q
+    qvel = jp.zeros(self.mjx_model.nv)
+
+    # x=+U(-0.5, 0.5), y=+U(-0.5, 0.5), yaw=U(-3.14, 3.14).
+
+    # d(xyzrpy)=U(-0.5, 0.5)
+    rng, key = jax.random.split(rng)
+    qvel = qvel.at[0:6].set(
+        jax.random.uniform(key, (6,), minval=-0.3, maxval=0.3)
+    )
+
+    data = self.make_data(
+        self.mj_model,
+        qpos=qpos,
+        qvel=qvel,
+        ctrl=qpos[7:],
+        impl=self.mjx_model.impl.value,
+        nconmax=self._config.nconmax,
+        njmax=self._config.njmax,
+    )
+    data = mjx.forward(self.mjx_model, data)
+
+    force_traj, rng = self.force_traj_gen.sample_force_traj(rng)
+    force_traj["forces"] *= 0.05
+    force_lin = jp.zeros(3)
+
+    info = {
+        "rng": rng,
+        "step": 0,
+        "last_act": jp.zeros(self.action_size),
+        "last_last_act": jp.zeros(self.action_size),
+        "motor_targets": jp.zeros(self.action_size),
+        "feet_air_time": jp.zeros(2),
+        "last_contact": jp.zeros(2, dtype=bool),
+        "swing_peak": jp.zeros(2),
+        # Push related.
+        "force_traj": force_traj,
+        "force_lin": force_lin,
+        "time": 0.0,
+    }
+
+    metrics = {}
+    for k in self._config.reward_config.scales.keys():
+      metrics[f"reward/{k}"] = jp.zeros(())
+    metrics["swing_peak"] = jp.zeros(())
+
+    #contact = jp.hstack([jp.any(left_feet_contact), jp.any(right_feet_contact)])
+    contact = get_contacts(data.contact, self.ids)
+
+    obs = self._get_obs(data, info, contact)
+    reward, done = jp.zeros(2)
+    return mjx_env.State(data, obs, reward, done, metrics, info)
+  
+  def apply_pushes(self, data: mjx.Data, info: dict[str, Any]):
+    lin_force = self.force_traj_gen.get_force_at_time(
+        info["force_traj"], info["time"])
+    wrench = jp.hstack([lin_force, jp.zeros(3)])
+    xfrc = data.xfrc_applied.at[self.ids["base_id"]].set(wrench)
+    data = data.replace(xfrc_applied=xfrc)
+    return data, lin_force
+
+  def step(self, state: mjx_env.State, action: jax.Array) -> mjx_env.State:
+    state.info["rng"], push1_rng, push2_rng = jax.random.split(
+        state.info["rng"], 3
+    )
+    
+    data, lin_force = self.apply_pushes(state.data, state.info)
+    state.info["force_lin"] = lin_force
+    state = state.replace(data=data)
+
+    # state = self._reset_if_outside_bounds(state)
+
+    motor_targets = action #self._default_pose + action * self._config.action_scale
+    data = step(
+        self.mjx_model, state.data, motor_targets, self.n_substeps, self.ids
+    )
+    state.info["motor_targets"] = motor_targets
+
+    contact = get_contacts(data.contact, self.ids)
+
+
+    obs = self._get_obs(data, state.info, contact)
+    done = self._get_termination(data)
+
+    body_poses = motion_retarget.body_poses_in_base_mjx(self._mjx_model,
+                                                        data,
+                                                        self.ids["base_id"])
+
+    rewards = self._get_reward(
+        data, action, state.info, state.metrics, body_poses, done
+    )
+    rewards = {
+        k: v * self._config.reward_config.scales[k] for k, v in rewards.items()
+    }
+    reward = jp.clip(sum(rewards.values()) * self.dt, 0.0, 10000.0)
+
+    state.info["time"] += self.dt
+    state.info["step"] += 1
+    state.info["last_act"] = action
+    state.info["rng"], cmd_rng = jax.random.split(state.info["rng"])
+    for k, v in rewards.items():
+      state.metrics[f"reward/{k}"] = v
+
+    done = done.astype(reward.dtype)
+    state = state.replace(data=data, obs=obs, reward=reward, done=done)
+    return state
+
+  def _get_obs(
+      self, data: mjx.Data, info: dict[str, Any], contact: jax.Array
+  ) -> mjx_env.Observation:
+    gyro = self.get_gyro(data)
+    info["rng"], noise_rng = jax.random.split(info["rng"])
+    noisy_gyro = (
+        gyro
+        + (2 * jax.random.uniform(noise_rng, shape=gyro.shape) - 1)
+        * self._config.noise_config.level
+        * self._config.noise_config.scales.gyro
+    )
+
+    gravity = data.site_xmat[self._site_id].T @ jp.array([0, 0, -1])
+    info["rng"], noise_rng = jax.random.split(info["rng"])
+    noisy_gravity = (
+        gravity
+        + (2 * jax.random.uniform(noise_rng, shape=gravity.shape) - 1)
+        * self._config.noise_config.level
+        * self._config.noise_config.scales.gravity
+    )
+
+    joint_angles = data.qpos[7:]
+    info["rng"], noise_rng = jax.random.split(info["rng"])
+    noisy_joint_angles = (
+        joint_angles
+        + (2 * jax.random.uniform(noise_rng, shape=joint_angles.shape) - 1)
+        * self._config.noise_config.level
+        * self._config.noise_config.scales.joint_pos
+    )
+
+    joint_vel = data.qvel[6:]
+    info["rng"], noise_rng = jax.random.split(info["rng"])
+    noisy_joint_vel = (
+        joint_vel
+        + (2 * jax.random.uniform(noise_rng, shape=joint_vel.shape) - 1)
+        * self._config.noise_config.level
+        * self._config.noise_config.scales.joint_vel
+    )
+
+
+    linvel = self.get_local_linvel(data)
+    info["rng"], noise_rng = jax.random.split(info["rng"])
+    noisy_linvel = (
+        linvel
+        + (2 * jax.random.uniform(noise_rng, shape=linvel.shape) - 1)
+        * self._config.noise_config.level
+        * self._config.noise_config.scales.linvel
+    )
+
+    ref_pos = self.qpos_traj[info["step"], 7:]
+    ref_vel = self.qvel_traj[info["step"], :]
+
+    # Pose track error.
+    current_pose = data.qpos[:7]
+    ref_pose = self.qpos_traj[info["step"], :7]
+
+    pos_error = ref_pose[:3] - current_pose[:3]
+    orien_mat = rot.rot_error_matrix(ref_pose[3:7], current_pose[3:7])
+
+    pose_track_error = jp.hstack([
+        pos_error,
+        orien_mat[:, :2].flatten()
+    ])
+    
+    state = jp.hstack([
+        noisy_linvel,  # 3
+        noisy_gyro,  # 3
+        noisy_gravity,  # 3
+        noisy_joint_angles - self._default_pose,
+        noisy_joint_vel,
+        info["last_act"],
+        pose_track_error,
+        ref_pos,
+        ref_vel,
+    ])
+
+    accelerometer = self.get_accelerometer(data)
+    global_angvel = self.get_global_angvel(data)
+    feet_vel = data.sensordata[self._foot_linvel_sensor_adr].ravel()
+    root_height = data.qpos[2]
+
+    privileged_state = jp.hstack([
+        state,
+        gyro,  # 3
+        accelerometer,  # 3
+        gravity,  # 3
+        linvel,  # 3
+        global_angvel,  # 3
+        joint_angles - self._default_pose,
+        joint_vel,
+        root_height,  # 1
+        data.actuator_force,
+        contact,  # 2
+        feet_vel,  # 4*3
+        pose_track_error,
+        ref_pos,
+        ref_vel,
+    ])
+
+    return {
+        "state": state,
+        "privileged_state": privileged_state,
+    }
+  
+  def _get_reward(
+      self,
+      data: mjx.Data,
+      action: jax.Array,
+      info: dict[str, Any],
+      metrics: dict[str, Any],
+      body_poses: jax.Array,
+      done: jax.Array,
+  ) -> dict[str, jax.Array]:
+    del metrics  # Unused.
+    return {
+        "action_rate": self._cost_action_rate(
+            action, info["last_act"], info["last_last_act"]
+        ),
+        "termination": self._cost_termination(done),
+        "base_pos": self._reward_base_pos(data, info),
+        "base_quat": self._reward_base_quat(data, info),
+        "body_pos": self._reward_body_pos(body_poses, info),
+        "body_orien": self._reward_body_orien(body_poses, info),
+        "body_linvel": self._reward_body_linvel(data, info),
+        "body_angvel": self._reward_body_angvel(data, info),
+    }
+  
+  def _get_termination(self, data: mjx.Data) -> jax.Array:
+    fall_termination = self.get_gravity(data)[-1] < 0.0
+    return (
+        fall_termination | jp.isnan(data.qpos).any() | jp.isnan(data.qvel).any()
+    )
+  
+  def _reward_base_pos(self, data, info):
+    reference_base_pos = self.qpos_traj[info["step"], :3]
+    current_base_pos = data.qpos[:3]
+    err =jp.sum(jp.square(reference_base_pos - current_base_pos))
+    rew = jp.exp(-err / (self._config.reward_config.pos_sigma ** 2))
+    return rew
+  
+  def _reward_base_quat(self, data, info):
+    reference_base_quat = self.qpos_traj[info["step"], 3:7]
+    current_base_quat = data.qpos[3:7]
+    err = motion_retarget.quat_error_magnitude(
+      reference_base_quat, current_base_quat
+    ) ** 2
+    rew = jp.exp(-err / (self._config.reward_config.ang_sigma ** 2))
+    return rew
+  
+  def _reward_body_pos(self, body_poses, info):
+    reference_body_pose = self.body_poses[info["step"], :, :3]
+    current_body_pos = body_poses[:, :3]
+    err = jp.sum(jp.square(reference_body_pose - current_body_pos), axis = -1)
+    mean_err = jp.mean(err)
+    rew = jp.exp(-mean_err / (self._config.reward_config.pos_sigma **2))
+    return rew
+  
+  def _reward_body_orien(self, body_poses, info):
+    reference_body_quat = self.body_poses[info["step"], :, 3:7]
+    current_body_quat = body_poses[:, 3:7]
+    err = motion_retarget.quat_error_magnitude(
+      reference_body_quat, current_body_quat)
+    mean_err = jp.mean(err ** 2)
+    rew = jp.exp(-mean_err / (self._config.reward_config.ang_sigma **2))
+    return rew
+  
+  def _reward_body_linvel(self, data, info):
+    reference_body_vel = self.body_vels[info["step"], :, :3]
+    body_linvel = data.cvel[:, :3]
+    err = jp.sum(jp.square(reference_body_vel - body_linvel), axis =-1)
+    mean_err = jp.mean(err)
+    rew = jp.exp(-mean_err / (self._config.reward_config.linvel_sigma **2))
+    return rew
+  
+  def _reward_body_angvel(self, data, info):
+    reference_body_angvel = self.body_vels[info["step"], :, 3:6]
+    body_angvel = data.cvel[:, 3:6]
+    err = jp.sum(jp.square(reference_body_angvel - body_angvel), axis =-1)
+    mean_err = jp.mean(err)
+    rew = jp.exp(-mean_err / (self._config.reward_config.angvel_sigma **2))
+    return rew
+
+  def _cost_action_rate(
+      self, act: jax.Array, last_act: jax.Array, last_last_act: jax.Array
+  ) -> jax.Array:
+    del last_last_act  # Unused.
+    c1 = jp.sum(jp.square(act - last_act))
+    return c1
+  
+  def _cost_termination(self, done: jax.Array) -> jax.Array:
+    return done

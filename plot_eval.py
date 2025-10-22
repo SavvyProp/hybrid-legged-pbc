@@ -2,8 +2,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 def plot_impulse():
     ft = np.genfromtxt("data/eval/ftk3_impulse_frc_1dt_success_rate.csv", delimiter=",")
+    ft_no_rew = np.genfromtxt("data/eval/ftk_no_vel_rew_impulse_frc_1dt_success_rate.csv", delimiter=",")
     pd = np.genfromtxt("data/eval/pd32_impulse_frc_1dt_success_rate.csv", delimiter=",")
     plt.plot(ft[:, 0], ft[:, 1], label="PD + Centroidal FF")
+    plt.plot(ft_no_rew[:, 0], ft_no_rew[:, 1], label="PD + Centroidal FF (no vel rew)")
     plt.plot(pd[:, 0], pd[:, 1], label="PD")
     plt.xlabel("Impulse Force (N)")
     plt.ylabel("Success Rate")
@@ -13,9 +15,11 @@ def plot_impulse():
 
 def plot_constant():
     ft = np.genfromtxt("data/eval/ftk_constant_frc_alive.csv", delimiter=",")
+    ft_no_rew = np.genfromtxt("data/eval/ftk_no_vel_rew_constant_frc_alive.csv", delimiter=",")
     pd = np.genfromtxt("data/eval/pd_constant_frc_alive.csv", delimiter=",")
     frc = np.arange(1000) * 0.1
     plt.plot(frc, ft, label="PD + Centroidal FF")
+    plt.plot(frc, ft_no_rew, label="PD + Centroidal FF (no vel rew)")
     plt.plot(frc, pd, label="PD")
     plt.xlabel("Constant Force (N)")
     plt.ylabel("Number of Alive Envs")
@@ -24,5 +28,5 @@ def plot_constant():
     plt.show()
 
 if __name__ == "__main__":
-    #plot_impulse()
+    plot_impulse()
     plot_constant()

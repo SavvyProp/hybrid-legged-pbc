@@ -65,11 +65,12 @@ class T1Env(mjx_env.MjxEnv):
 
   def __init__(
       self,
-      xml_path: str,
       config: config_dict.ConfigDict,
       config_overrides: Optional[Dict[str, Union[str, int, list[Any]]]] = None,
   ) -> None:
     super().__init__(config, config_overrides)
+
+    self._xml_path = "models/booster_t1_pgnd/scene_mjx_feetonly_flat_terrain.xml"
 
     self._mj_model = mujoco.MjModel.from_xml_path(
             "models/booster_t1_pgnd/scene_mjx_feetonly_flat_terrain.xml"
@@ -80,7 +81,6 @@ class T1Env(mjx_env.MjxEnv):
     self._mj_model.vis.global_.offheight = 2160
 
     self._mjx_model = mjx.put_model(self._mj_model, impl=self._config.impl)
-    self._xml_path = xml_path
     self.ids = bids.ids
 
   # Sensor readings.

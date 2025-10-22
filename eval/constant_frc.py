@@ -47,7 +47,7 @@ def test_force(type):
     if type == "pd":
         model_path = "training/pd_3/walk_policy"
     else:
-        model_path = "training/ftk3/walk_policy"
+        model_path = f"training/{type}/walk_policy"
 
     saved_params = model.load_params(model_path)
 

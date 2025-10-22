@@ -66,7 +66,7 @@ def metrics_count(rew, metrics):
         rew += metrics[name]
     return rew
 
-dir = "training/ft_ext"
+dir = "training/ftk_no_vel_rew"
 
 model_path = dir + "/walk_policy"
 saved_params = model.load_params(model_path)
@@ -88,7 +88,8 @@ obs_list = []
 nn_p_list = []
 states = []
 prev_info = state.info
-
+data2 = state.data.replace(qpos = init_qpos)
+state = state.replace(data=data2)
 command = jnp.array([0.5, 0.0, 0.0])
 
 # ...existing imports...
