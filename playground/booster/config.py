@@ -72,5 +72,5 @@ ppo_params.network_factory = config_dict.create(
 #        noise_std_type = "scalar"
 #    )
 
-ppo_params.num_timesteps = 120_000_000
+ppo_params.num_timesteps = 40_000_000
 #ppo_params.normalize_observations = False
