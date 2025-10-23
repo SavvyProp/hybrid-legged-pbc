@@ -445,7 +445,7 @@ class Track(t1_base.T1Env):
     #fall_termination = self.get_gravity(data)[-1] < 0.0
     contact_termination = contacts["trunk"] | contacts["head"]
     return (
-        contact_termination | jp.isnan(data.qpos).any() | jp.isnan(data.qvel).any()
+        0 | jp.isnan(data.qpos).any() | jp.isnan(data.qvel).any()
     )
   
   def _reward_base_pos(self, data, info):
