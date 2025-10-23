@@ -28,7 +28,7 @@ from mujoco_playground._src import mjx_env
 #from mujoco_playground._src.locomotion.t1 import base as t1_base
 from mujoco_playground._src.locomotion.t1 import t1_constants as consts
 from playground.booster import base_pd as t1_base
-from rewards.mjx_col import get_contacts
+from rewards.mjx_col import get_contact_dict
 from rewards import facet
 from lowctrl import pd
 from motion_retarget import motion_retarget
@@ -192,16 +192,7 @@ class Track(t1_base.T1Env):
     self._torso_mass = self._mj_model.body_subtreemass[self._torso_body_id]
     self._site_id = self._mj_model.site("imu").id
 
-    self._feet_site_id = np.array(
-        [self._mj_model.site(name).id for name in consts.FEET_SITES]
-    )
     self._floor_geom_id = self._mj_model.geom("floor").id
-    self._left_feet_geom_id = np.array(
-        [self._mj_model.geom(name).id for name in consts.LEFT_FEET_GEOMS]
-    )
-    self._right_feet_geom_id = np.array(
-        [self._mj_model.geom(name).id for name in consts.RIGHT_FEET_GEOMS]
-    )
 
     foot_linvel_sensor_adr = []
     for site in consts.FEET_SITES:
@@ -212,22 +203,6 @@ class Track(t1_base.T1Env):
           list(range(sensor_adr, sensor_adr + sensor_dim))
       )
     self._foot_linvel_sensor_adr = jp.array(foot_linvel_sensor_adr)
-
-    self._left_foot_box_geom_id = self._mj_model.geom("left_foot").id
-    self._right_foot_box_geom_id = self._mj_model.geom("right_foot").id
-
-    # Contact sensor IDs.
-    self._left_foot_floor_found_sensor = [
-        self._mj_model.sensor(f"left_foot_{i}_floor_found").id
-        for i in range(1, 5)
-    ]
-    self._right_foot_floor_found_sensor = [
-        self._mj_model.sensor(f"right_foot_{i}_floor_found").id
-        for i in range(1, 5)
-    ]
-    self._left_foot_right_foot_found_sensor = self._mj_model.sensor(
-        "left_foot_right_foot_found"
-    ).id
 
   def _reset_if_outside_bounds(self, state: mjx_env.State) -> mjx_env.State:
     qpos = state.data.qpos
@@ -284,10 +259,8 @@ class Track(t1_base.T1Env):
       metrics[f"reward/{k}"] = jp.zeros(())
     metrics["swing_peak"] = jp.zeros(())
 
-    #contact = jp.hstack([jp.any(left_feet_contact), jp.any(right_feet_contact)])
-    contact = get_contacts(data.contact, self.ids)
 
-    obs = self._get_obs(data, info, contact)
+    obs = self._get_obs(data, info)
     reward, done = jp.zeros(2)
     return mjx_env.State(data, obs, reward, done, metrics, info)
   
@@ -316,11 +289,10 @@ class Track(t1_base.T1Env):
     )
     state.info["motor_targets"] = motor_targets
 
-    contact = get_contacts(data.contact, self.ids)
+    contacts = get_contact_dict(data.contact, self.ids)
 
-
-    obs = self._get_obs(data, state.info, contact)
-    done = self._get_termination(data)
+    obs = self._get_obs(data, state.info)
+    done = self._get_termination(data, contacts)
 
     body_poses = motion_retarget.body_poses_in_base_mjx(self._mjx_model,
                                                         data,
@@ -346,7 +318,7 @@ class Track(t1_base.T1Env):
     return state
 
   def _get_obs(
-      self, data: mjx.Data, info: dict[str, Any], contact: jax.Array
+      self, data: mjx.Data, info: dict[str, Any]
   ) -> mjx_env.Observation:
     gyro = self.get_gyro(data)
     info["rng"], noise_rng = jax.random.split(info["rng"])
@@ -423,7 +395,6 @@ class Track(t1_base.T1Env):
 
     accelerometer = self.get_accelerometer(data)
     global_angvel = self.get_global_angvel(data)
-    feet_vel = data.sensordata[self._foot_linvel_sensor_adr].ravel()
     root_height = data.qpos[2]
 
     privileged_state = jp.hstack([
@@ -437,8 +408,6 @@ class Track(t1_base.T1Env):
         joint_vel,
         root_height,  # 1
         data.actuator_force,
-        contact,  # 2
-        feet_vel,  # 4*3
         pose_track_error,
         ref_pos,
         ref_vel,
@@ -472,10 +441,11 @@ class Track(t1_base.T1Env):
         "body_angvel": self._reward_body_angvel(data, info),
     }
   
-  def _get_termination(self, data: mjx.Data) -> jax.Array:
-    fall_termination = self.get_gravity(data)[-1] < 0.0
+  def _get_termination(self, data, contacts) -> jax.Array:
+    #fall_termination = self.get_gravity(data)[-1] < 0.0
+    contact_termination = contacts["trunk"] | contacts["head"]
     return (
-        fall_termination | jp.isnan(data.qpos).any() | jp.isnan(data.qvel).any()
+        contact_termination | jp.isnan(data.qpos).any() | jp.isnan(data.qvel).any()
     )
   
   def _reward_base_pos(self, data, info):

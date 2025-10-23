@@ -177,16 +177,6 @@ class Joystick(t1_base.T1Env):
     self._torso_mass = self._mj_model.body_subtreemass[self._torso_body_id]
     self._site_id = self._mj_model.site("imu").id
 
-    self._feet_site_id = np.array(
-        [self._mj_model.site(name).id for name in consts.FEET_SITES]
-    )
-    self._floor_geom_id = self._mj_model.geom("floor").id
-    self._left_feet_geom_id = np.array(
-        [self._mj_model.geom(name).id for name in consts.LEFT_FEET_GEOMS]
-    )
-    self._right_feet_geom_id = np.array(
-        [self._mj_model.geom(name).id for name in consts.RIGHT_FEET_GEOMS]
-    )
 
     foot_linvel_sensor_adr = []
     for site in consts.FEET_SITES:
@@ -198,21 +188,7 @@ class Joystick(t1_base.T1Env):
       )
     self._foot_linvel_sensor_adr = jp.array(foot_linvel_sensor_adr)
 
-    self._left_foot_box_geom_id = self._mj_model.geom("left_foot").id
-    self._right_foot_box_geom_id = self._mj_model.geom("right_foot").id
 
-    # Contact sensor IDs.
-    self._left_foot_floor_found_sensor = [
-        self._mj_model.sensor(f"left_foot_{i}_floor_found").id
-        for i in range(1, 5)
-    ]
-    self._right_foot_floor_found_sensor = [
-        self._mj_model.sensor(f"right_foot_{i}_floor_found").id
-        for i in range(1, 5)
-    ]
-    self._left_foot_right_foot_found_sensor = self._mj_model.sensor(
-        "left_foot_right_foot_found"
-    ).id
 
   def _reset_if_outside_bounds(self, state: mjx_env.State) -> mjx_env.State:
     qpos = state.data.qpos
@@ -349,16 +325,6 @@ class Joystick(t1_base.T1Env):
     state.info["filtered_angvel"] = (
         angvel * 1.0 + state.info["filtered_angvel"] * 0.0
     )
-
-    left_feet_contact = jp.array([
-        data.sensordata[self._mj_model.sensor_adr[sensor_id]] > 0
-        for sensor_id in self._left_foot_floor_found_sensor
-    ])
-    right_feet_contact = jp.array([
-        data.sensordata[self._mj_model.sensor_adr[sensor_id]] > 0
-        for sensor_id in self._right_foot_floor_found_sensor
-    ])
-    #contact = jp.hstack([jp.any(left_feet_contact), jp.any(right_feet_contact)])
     contact = get_contacts(data.contact, self.ids)
 
     contact_filt = contact | state.info["last_contact"]

@@ -24,15 +24,23 @@ def get_forces(data, ids):
     return left_force, right_force
 
 def get_contacts(contact, ids):
-    left_foot = jnp.array([ 
-        check_collision(contact, ids["col"]["floor"], id)
-        for id in ids["col"]["left_foot"]])
-    right_foot = jnp.array([ 
-        check_collision(contact, ids["col"]["floor"], id)
-        for id in ids["col"]["right_foot"]])
+    left_foot = check_collision(contact, ids["col"]["floor"], 
+                                id["col"]["left_foot"])
+    right_foot = check_collision(contact, ids["col"]["floor"], 
+                                 id["col"]["right_foot"])
     
-    contact = jnp.array([jnp.any(left_foot), jnp.any(right_foot)])
+    contact = jnp.array([left_foot, right_foot])
     return contact
+
+def get_contact_dict(contact, ids):
+    contact_dict = {}
+    for key in ids["col"]:
+        if key != "floor":
+            contact_dict[key] = check_collision(contact, ids["col"]["floor"], 
+                                                ids["col"][key])
+    return contact_dict
+
+# Rewrite get_contacts to return a dictionary of body_id, contact
 
 
 def get_collision_info(

@@ -1,5 +1,5 @@
 <mujoco model="t1 feetonly flat terrain scene">
-  <include file="t1_mjx_feetonly.xml"/>
+  <include file="full_col_t1.xml"/>
 
   <statistic center="0.35 0.1 0.7" extent="0.85" meansize="0.04"/>
 
@@ -22,9 +22,6 @@
   <worldbody>
     <geom name="floor" size="0 0 0.01" type="plane" material="groundplane" priority="1" friction="0.6" contype="1" conaffinity="2" condim="3"/>
   </worldbody>
-
-  <include file="sensor.xml"/>
-
   <keyframe>
     <key name="home"
       qpos="

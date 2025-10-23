@@ -113,19 +113,11 @@ max_vel = jnp.ones([23]) * 10.0
 
 base_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, 'Trunk')
 
-left_col = [
-    model.geom("left_foot_1").id,
-    model.geom("left_foot_2").id,
-    model.geom("left_foot_3").id,
-    model.geom("left_foot_4").id
-]
 
-right_col = [
-    model.geom("right_foot_1").id,
-    model.geom("right_foot_2").id,
-    model.geom("right_foot_3").id,
-    model.geom("right_foot_4").id
-]
+left_foot_col = model.geom("left_foot_col").id
+right_foot_col = model.geom("right_foot_col").id
+trunk_col = model.geom("trunk_col").id
+head_col = model.geom("head_col").id
 
 floor_col = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "floor")
 
@@ -154,8 +146,10 @@ ids = {
     "base_id": base_id,
     "imu_id": model.site("imu").id,
     "col": {
-        "left_foot": left_col,
-        "right_foot": right_col,
+        "left_foot": left_foot_col,
+        "right_foot": right_foot_col,
+        "trunk": trunk_col,
+        "head": head_col,
         "floor": floor_col
     },
     "dummy_joints": dummy_joints,
