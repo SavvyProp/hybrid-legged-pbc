@@ -16,6 +16,7 @@ from playground.booster import track
 #from playground.booster import joystick_pbc as joystick
 from playground.booster.config import ppo_params
 from models.booster_t1_pgnd.booster_ids import ids
+from rewards.mjx_col import get_contact_dict
 env = track.Track()
 
 ppo_param_ = env.override_config(ppo_params)
