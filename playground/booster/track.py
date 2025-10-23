@@ -83,7 +83,7 @@ def default_config() -> config_dict.ConfigDict:
               # action rate
               action_rate = -1e-1,
               # Termination
-              termination=-100.0,
+              termination=-1.0,
               # Pose related rewards.
               collision=-1.0,
           ),
