@@ -1,5 +1,5 @@
 from playground.booster import track
-from playground.booster.randomize import domain_randomize
+from playground.booster.randomize_track import domain_randomize
 from datetime import datetime
 import functools
 import matplotlib.pyplot as plt
