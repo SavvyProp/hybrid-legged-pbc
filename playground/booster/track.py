@@ -84,6 +84,7 @@ def default_config() -> config_dict.ConfigDict:
               action_rate = -1e-1,
               # Termination
               termination=-10.0,
+              dof_pos_limits=-1.0,
           ),
           pos_sigma=0.3,
           ang_sigma=0.4,
@@ -441,6 +442,7 @@ class Track(t1_base.T1Env):
         "body_orien": self._reward_body_orien(body_poses, info),
         "body_linvel": self._reward_body_linvel(data, info),
         "body_angvel": self._reward_body_angvel(data, info),
+        "dof_pos_limits": self._cost_joint_pos_limits(data.qpos[7:]),
     }
   
   def _get_termination(self, data, contacts) -> jax.Array:
@@ -508,3 +510,8 @@ class Track(t1_base.T1Env):
   
   def _cost_termination(self, done: jax.Array) -> jax.Array:
     return done
+  
+  def _cost_joint_pos_limits(self, qpos: jax.Array) -> jax.Array:
+    out_of_limits = -jp.clip(qpos - self._soft_lowers, None, 0.0)
+    out_of_limits += jp.clip(qpos - self._soft_uppers, 0.0, None)
+    return jp.sum(out_of_limits)
