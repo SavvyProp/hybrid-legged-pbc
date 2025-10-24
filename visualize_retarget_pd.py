@@ -45,7 +45,7 @@ def makeIFN():
 
 rew = 0.0
 
-dir = "training/motion_retarget_2"
+dir = "training/motion_retarget_3"
 
 model_path = dir + "/walk_policy"
 saved_params = model.load_params(model_path)

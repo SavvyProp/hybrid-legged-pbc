@@ -446,10 +446,13 @@ class Track(t1_base.T1Env):
     }
   
   def _get_termination(self, data, contacts) -> jax.Array:
-    #fall_termination = self.get_gravity(data)[-1] < 0.0
+    current_base_pos = data.qpos[:3]
+    ref_base_pos = self.qpos_traj[0, :3]
+    dist = jp.linalg.norm(current_base_pos - ref_base_pos)
+    out_of_bounds = dist > 0.3
     contact_termination = contacts["trunk"] | contacts["head"]
     return (
-        contact_termination | jp.isnan(data.qpos).any() | jp.isnan(data.qvel).any()
+        out_of_bounds | contact_termination | jp.isnan(data.qpos).any() | jp.isnan(data.qvel).any()
     )
   
   def _reward_base_pos(self, data, info):
