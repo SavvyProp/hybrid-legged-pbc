@@ -149,7 +149,7 @@ class Track(t1_base.T1Env):
     #self._init_q = jp.array(self._mj_model.keyframe("home").qpos)
     # Take self._init_q from first frame of qpos_traj
     self._init_q = self.qpos_traj[0, :]
-    self._init_q = self._init_q.at[2].add(0.07)
+    self._init_q = self._init_q.at[2].add(0.04)
     
     self._default_pose = jp.array(self._mj_model.keyframe("home").qpos[7:])
 
