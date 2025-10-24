@@ -10,7 +10,7 @@ def logit2limit(logit, ids):
     center = ids["default_qpos"][7:]
     #scale = 1.5
     scale = jnp.minimum(jnp.maximum(tanh_mag, 1.0), 1.6)
-    return jnp.tanh(logit) * scale + center
+    return jnp.tanh(logit * 0.5) * scale + center
 
 def step(mjx_model, state, act, ids):
     nn_p_logit = act[:ids["ctrl_num"]]
