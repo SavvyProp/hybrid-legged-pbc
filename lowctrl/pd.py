@@ -2,13 +2,14 @@ import jax.numpy as jnp
 import jax
 
 def logit2limit(logit, ids):
-    #joint20_limits = ids["jnt_limits"]
-    #center = jnp.mean(joint20_limits, axis=1)
-    #d_top = joint20_limits[:, 1] - center
-    #tanh_mag = jnp.abs(d_top)
+    joint20_limits = ids["jnt_limits"]
+    center = jnp.mean(joint20_limits, axis=1)
+    d_top = joint20_limits[:, 1] - center
+    tanh_mag = jnp.abs(d_top)
     #return jnp.tanh(logit) * tanh_mag + center
     center = ids["default_qpos"][7:]
-    scale = 1.5
+    #scale = 1.5
+    scale = jnp.maximum(tanh_mag, 1.3)
     return jnp.tanh(logit) * scale + center
 
 def step(mjx_model, state, act, ids):
