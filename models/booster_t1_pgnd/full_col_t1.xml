@@ -154,7 +154,7 @@
                 mass="0.327214" diaginertia="0.008159 0.00813104 0.000214962"/>
               <joint name="Left_Elbow_Yaw" range="-2.44 0" class="elbow_yaw"/>
               <geom class="visual" mesh="left_hand_link"/>
-              <geom class="collision" size="0.03 0.0575" pos="0 0.13 0" quat="0.707105 0.707108 0 0" type="capsule"/>
+              <geom name="left_hand_col" class="collision" size="0.03 0.0575" pos="0 0.13 0" quat="0.707105 0.707108 0 0" type="capsule"/>
               <site name="left_hand" pos="0 .215 0"/>
             </body>
           </body>
@@ -181,7 +181,7 @@
                 mass="0.327214" diaginertia="0.008159 0.00813104 0.000214962"/>
               <joint name="Right_Elbow_Yaw" range="0 2.44" class="elbow_yaw"/>
               <geom class="visual" mesh="right_hand_link"/>
-              <geom class="collision" size="0.03 0.0575" pos="0 -0.13 0" quat="0.707105 0.707108 0 0" type="capsule"/>
+              <geom name="right_hand_col" class="collision" size="0.03 0.0575" pos="0 -0.13 0" quat="0.707105 0.707108 0 0" type="capsule"/>
               <site name="right_hand" pos="0 -.215 0"/>
             </body>
           </body>

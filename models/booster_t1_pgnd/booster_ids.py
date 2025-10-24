@@ -115,6 +115,8 @@ base_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, 'Trunk')
 
 left_foot_col = model.geom("left_foot_col").id
 right_foot_col = model.geom("right_foot_col").id
+left_hand_col = model.geom("left_hand_col").id
+right_hand_col = model.geom("right_hand_col").id
 trunk_col = model.geom("trunk_col").id
 head_col = model.geom("head_col").id
 
@@ -145,6 +147,8 @@ ids = {
     "base_id": base_id,
     "imu_id": model.site("imu").id,
     "col": {
+        "left_hand": left_hand_col,
+        "right_hand": right_hand_col,
         "left_foot": left_foot_col,
         "right_foot": right_foot_col,
         "trunk": trunk_col,

@@ -109,6 +109,10 @@ class Track(track):
       config_overrides: Optional[Dict[str, Union[str, int, list[Any]]]] = None,):
     super().__init__(config, config_overrides)
 
+  @property
+  def action_size(self) -> int:
+    return ft_ref.default_act(self.ids).shape[0]
+
   def _get_obs(self, data: mjx.Data, info: Dict[str, Any]) -> jax.Array:
     state_obs = super()._get_obs(data, info)
     f = info["ft_dict"]["f"],
@@ -212,7 +216,7 @@ class Track(track):
                                                         self.ids["base_id"])
 
     rewards = self._get_reward(
-        data, action, state.info, state.metrics, body_poses, done
+        data, action, state.info, state.metrics, body_poses, contacts, done
     )
     rewards = {
         k: v * self._config.reward_config.scales[k] for k, v in rewards.items()
@@ -233,3 +237,113 @@ class Track(track):
     done = done.astype(reward.dtype)
     state = state.replace(data=data, obs=obs, reward=reward, done=done)
     return state
+  
+  def _get_reward(
+      self,
+      data: mjx.Data,
+      action: jax.Array,
+      info: dict[str, Any],
+      metrics: dict[str, Any],
+      body_poses: jax.Array,
+      contact,
+      done: jax.Array,
+  ) -> dict[str, jax.Array]:
+    rew = super()._get_reward(data, action, info, metrics, body_poses, done)
+    components = ft_ref.ctrl2components(data, action, self.ids)
+    rew["pbc_w"] = self._cost_pbc_w(action, contact)
+    rew["maqp_cons"] = self._reward_maqp_cons(data, info, action)
+    rew["vel_def"] = self._reward_des_vel(components)
+    rew["vel_action_rate"] = self._cost_vel_action_rate(action, info["last_act"])
+    return rew
+
+
+  def _cost_vel_action_rate(
+      self, act: jax.Array, last_act: jax.Array
+  ) -> jax.Array:
+    vel_act = ctrl2logits(act, self.ids)["des_com_vel"]
+    angvel_act = ctrl2logits(act, self.ids)["des_com_angvel"]
+    vel_last_act = ctrl2logits(last_act, self.ids)["des_com_vel"]
+    angvel_last_act = ctrl2logits(last_act, self.ids)["des_com_angvel"]
+
+    c1 = jp.sum(jp.square(vel_act - 
+                          vel_last_act))
+    c2 = jp.sum(jp.square(angvel_act - 
+                          angvel_last_act))
+    return c1 + c2
+  
+  def _reward_des_vel(self, components):
+    des_vel_mag = jp.linalg.norm(components["des_com_vel"])
+    des_angvel_mag = jp.linalg.norm(components["des_com_angvel"])
+    des_vel_cap = 1.5
+    des_angvel_cap = 3.0
+    des_vel_rew = jp.clip(des_vel_mag - des_vel_cap,
+                           min = 0.0, max = None)
+    des_angvel_rew = jp.clip(des_angvel_mag - des_angvel_cap,
+                           min = 0.0, max = None)
+    rew_vel_lim = jp.exp(-(des_vel_rew + des_angvel_rew * 0.50))
+
+    # vel tracking reward
+
+    lin_vel_error = jp.sum(jp.square(lin_vel[:2] - components["des_com_vel"][:2]))
+    linvel_rew = jp.exp(-lin_vel_error / self._config.reward_config.tracking_sigma)
+
+    return rew_vel_lim * 0.1 # + linvel_rew
+  
+  def _reward_maqp_cons(self, data, info, action):
+    debug_dict = info["ft_dict"]
+    f = debug_dict["f"]
+    l_true, r_true = get_forces(data, self.ids)
+    #f = get_frc_pbc(self._mjx_model, data, action)
+    #f = jp.zeros([24]) # Placeholder
+    lf = f[0:3]
+    rf = f[6:9]
+    fac = 20000
+    left_frc_error = jp.sum(jp.square(lf - l_true)) / fac
+    right_frc_error = jp.sum(jp.square(rf - r_true)) / fac
+    frc_error = left_frc_error + right_frc_error
+    frc_rew = jp.exp(-frc_error)
+
+    u = debug_dict["u"]
+    tau_limits = self.ids["tau_limits"]
+    torque_sum = jp.sum(jp.clip(jp.abs(tau_limits) - jp.abs(u), 
+                                None, 0.0))
+    torque_lim_rew = jp.exp(torque_sum / 50.0)
+
+    # foot torque penalty method
+
+    lt = jp.linalg.norm(f[3:6])
+    rt = jp.linalg.norm(f[9:12])
+
+    def foot_torque_penalty(tau):
+      t2 = jp.clip(tau - 6.0, 0.0, None)
+      return jp.exp(-t2 / 10.0)
+    
+    lt_rew = foot_torque_penalty(lt)
+    rt_rew = foot_torque_penalty(rt)
+    foot_torque_rew = (lt_rew + rt_rew) / 2.0
+
+    # maqp torque rate penalty
+
+    #u_action_rate = jp.sum(jp.square(u - info["last_u_act"]))
+    #u_action_rate *= -0.000005
+    #u_action_rate = jp.clip(u_action_rate, -0.30, 0.0)
+    info["last_u_act"] = u
+
+    total_rew = (torque_lim_rew * 0.30 + 
+                 frc_rew * 0.10 + 
+                 foot_torque_rew * 0.30)
+                 #u_action_rate * 1.0)
+
+    rew = jp.nan_to_num(total_rew, nan=-1.0, posinf=-1.0, neginf=-1.0)
+
+    return rew
+  
+  def _cost_pbc_w(self, action, contacts):
+    contact = jp.array([
+      contacts["left_foot"],
+      contacts["right_foot"],
+      contacts["left_hand"],
+      contacts["right_hand"],
+    ])
+    logits = ctrl2logits(action, bids.ids)
+    return rewards.reward_pbc_w_leg_only(logits["w"], contact)
