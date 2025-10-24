@@ -290,6 +290,10 @@ class Track(t1_base.T1Env):
     state.info["motor_targets"] = motor_targets
 
     contacts = get_contact_dict(data.contact, self.ids)
+    #contacts = {
+    #  "trunk": 0,
+    #  "head": 0
+    #}
 
     obs = self._get_obs(data, state.info)
     done = self._get_termination(data, contacts)
@@ -445,7 +449,7 @@ class Track(t1_base.T1Env):
     #fall_termination = self.get_gravity(data)[-1] < 0.0
     contact_termination = contacts["trunk"] | contacts["head"]
     return (
-        0 | jp.isnan(data.qpos).any() | jp.isnan(data.qvel).any()
+        contact_termination | jp.isnan(data.qpos).any() | jp.isnan(data.qvel).any()
     )
   
   def _reward_base_pos(self, data, info):

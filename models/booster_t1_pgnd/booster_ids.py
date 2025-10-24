@@ -113,7 +113,6 @@ max_vel = jnp.ones([23]) * 10.0
 
 base_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, 'Trunk')
 
-
 left_foot_col = model.geom("left_foot_col").id
 right_foot_col = model.geom("right_foot_col").id
 trunk_col = model.geom("trunk_col").id
