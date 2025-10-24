@@ -94,7 +94,6 @@ def domain_randomize(model: mjx.Model, rng: jax.Array):
       "dof_frictionloss": 0,
       "dof_armature": 0,
       "body_mass": 0,
-      "qpos0": 0,
       "dof_damping": 0,
   })
 
