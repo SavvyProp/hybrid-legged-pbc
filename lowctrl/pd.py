@@ -11,7 +11,7 @@ def logit2limit(logit, ids):
     ave = (upper_limit + lower_limit) / 2.0
     # shift is - lower_limit
     phase_shift = (center - ave) / scale
-    des_pos = scale * jnp.tanh(logit * 0.5 / scale + phase_shift) + ave
+    des_pos = scale * jnp.tanh(logit * 1.0 / scale + phase_shift) + ave
     return des_pos
 
 def step(mjx_model, state, act, ids):
