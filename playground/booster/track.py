@@ -40,9 +40,10 @@ def step(
     action: jax.Array,
     n_substeps: int,
     ids: Dict[str, Any],
+    traj_center: Optional[jax.Array] = None,
 ) -> mjx.Data:
   def single_step(data, _):
-    ctrl = pd.step(model, data, action, ids)
+    ctrl = pd.step(model, data, action, ids, traj_center = traj_center)
     data = data.replace(ctrl = ctrl)
     data = mjx.step(model, data)
     return data, None
@@ -281,10 +282,11 @@ class Track(t1_base.T1Env):
     state = state.replace(data=data)
 
     # state = self._reset_if_outside_bounds(state)
+    traj_center = self.qpos_traj[state.info["step"], 7:]
 
     motor_targets = action #self._default_pose + action * self._config.action_scale
     data = step(
-        self.mjx_model, state.data, motor_targets, self.n_substeps, self.ids
+        self.mjx_model, state.data, motor_targets, self.n_substeps, self.ids, traj_center = traj_center
     )
     state.info["motor_targets"] = motor_targets
 
