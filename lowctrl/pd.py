@@ -7,11 +7,15 @@ def logit2limit(logit, ids):
     center = ids["default_qpos"][7:]
     upper_limit = joint20_limits[:, 1]
     lower_limit = joint20_limits[:, 0]
-    scale = (upper_limit - lower_limit) / 2.0
-    ave = (upper_limit + lower_limit) / 2.0
-    # shift is - lower_limit
-    phase_shift = (center - ave) / scale
-    des_pos = scale * jnp.tanh(logit * 1.0 / scale + phase_shift) + ave
+    scaling = jnp.array([
+        1.5,
+        1.0,
+        2.0, 1.8, 2.4, 2.4,
+        2.0, 1.8, 2.4, 2.4,
+        1.4, 1.5, 1.4, 1.0, 2.0, 1.0, 1.0,
+        1.4, 1.5, 1.4, 1.0, 2.0, 1.0, 1.0
+    ])
+    des_pos = center + scaling * jnp.tanh(logit)
     return des_pos
 
 def step(mjx_model, state, act, ids):
