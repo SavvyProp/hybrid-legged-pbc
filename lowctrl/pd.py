@@ -1,23 +1,30 @@
 import jax.numpy as jnp
 import jax
 
-def logit2limit(logit, ids):
-    #joint20_limits = ids["jnt_limits"]
+def logit2limit(logit, ids, traj_center = None):
+    joint20_limits = ids["jnt_limits"]
     #center = jnp.mean(joint20_limits, axis=1)
-    #d_top = joint20_limits[:, 1] - center
-    #tanh_mag = jnp.abs(d_top)
-    #return jnp.tanh(logit) * tanh_mag + center
     center = ids["default_qpos"][7:]
-    scale = 1.0
-    return jnp.tanh(logit) * scale + center
+    scaling = jnp.array([
+        1.5,
+        1.0,
+        2.0, 1.8, 2.4, 2.4,
+        2.0, 1.8, 2.4, 2.4,
+        1.4, 
+        1.5, 1.4, 1.0, 2.0, 1.0, 1.0,
+        1.5, 1.4, 1.0, 2.0, 1.0, 1.0
+    ])
+    #des_pos = center + scaling * jnp.tanh(logit)
+    #return des_pos
+    if traj_center is not None:
+        des_pos = traj_center + 1.0 * jnp.tanh(logit)
+    else:
+        des_pos = center + 1.0 * jnp.tanh(logit)
+    return des_pos
 
-def logit2vel(logit):
-    max_vel = 10.0
-    return jnp.tanh(logit) * max_vel
-
-def step(mjx_model, state, act, ids):
+def step(mjx_model, state, act, ids, traj_center = None):
     nn_p_logit = act[:ids["ctrl_num"]]
-    des_pos = logit2limit(nn_p_logit, ids)
+    des_pos = logit2limit(nn_p_logit, ids, traj_center = traj_center)
 
     kp = jnp.array(ids["p_gains"])
     kd = jnp.array(ids["d_gains"])
