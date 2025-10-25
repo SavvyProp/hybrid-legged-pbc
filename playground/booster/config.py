@@ -44,7 +44,7 @@ ppo_params = config_dict.create(
       unroll_length=20,
       num_minibatches=32,
       num_updates_per_batch=4,
-      discounting=0.97,
+      discounting=0.95,
       learning_rate=3e-4,
       entropy_cost=0.001,
       num_envs=8192,
@@ -55,8 +55,8 @@ ppo_params = config_dict.create(
   )
 
 ppo_params.network_factory = config_dict.create(
-        policy_hidden_layer_sizes=(1024, 512, 512, 256, 256),
-        value_hidden_layer_sizes=(1024, 512, 512, 256, 256),
+        policy_hidden_layer_sizes=(512, 256, 128),
+        value_hidden_layer_sizes=(1024, 512, 256, 128),
         policy_obs_key="state",
         value_obs_key="privileged_state",
         distribution_type = "normal",
