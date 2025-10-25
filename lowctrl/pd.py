@@ -3,16 +3,15 @@ import jax
 
 def logit2limit(logit, ids):
     joint20_limits = ids["jnt_limits"]
-    center = jnp.mean(joint20_limits, axis=1)
-    d_top = joint20_limits[:, 1] - center
-    tanh_mag = jnp.abs(d_top)
-    #return jnp.tanh(logit) * tanh_mag + center
+    #center = jnp.mean(joint20_limits, axis=1)
     center = ids["default_qpos"][7:]
-    #scale = 1.5
-    #scale = jnp.minimum(jnp.maximum(tanh_mag, 1.0), 1.6)
-    logit = jnp.clip(logit * 0.5, -1.3, 1.3)
-    des_pos = logit + center
-    #clipped_des_pos = jnp.clip(des_pos, joint20_limits[:, 0], joint20_limits[:, 1])
+    upper_limit = joint20_limits[:, 1]
+    lower_limit = joint20_limits[:, 0]
+    scale = (upper_limit - lower_limit) / 2.0
+    ave = (upper_limit + lower_limit) / 2.0
+    # shift is - lower_limit
+    phase_shift = (center - ave) / scale
+    des_pos = scale * jnp.tanh(logit * 0.5 / scale + phase_shift) + ave
     return des_pos
 
 def step(mjx_model, state, act, ids):
