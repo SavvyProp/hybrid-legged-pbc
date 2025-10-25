@@ -10,9 +10,10 @@ def logit2limit(logit, ids):
     center = ids["default_qpos"][7:]
     #scale = 1.5
     #scale = jnp.minimum(jnp.maximum(tanh_mag, 1.0), 1.6)
+    logit = jnp.clip(logit, -1.3, 1.3)
     des_pos = logit * 0.5 + center
-    clipped_des_pos = jnp.clip(des_pos, joint20_limits[:, 0], joint20_limits[:, 1])
-    return clipped_des_pos
+    #clipped_des_pos = jnp.clip(des_pos, joint20_limits[:, 0], joint20_limits[:, 1])
+    return des_pos
 
 def step(mjx_model, state, act, ids):
     nn_p_logit = act[:ids["ctrl_num"]]
