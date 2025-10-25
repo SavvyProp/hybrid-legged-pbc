@@ -451,7 +451,7 @@ class Track(t1_base.T1Env):
     current_base_pos = data.qpos[:3]
     ref_base_pos = self.qpos_traj[0, :3]
     dist = jp.linalg.norm(current_base_pos - ref_base_pos)
-    out_of_bounds = dist > 0.3
+    out_of_bounds = dist > 0.4
     contact_termination = contacts["trunk"] | contacts["head"]
     return (
         out_of_bounds | contact_termination | jp.isnan(data.qpos).any() | jp.isnan(data.qvel).any()
