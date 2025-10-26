@@ -112,7 +112,7 @@ def default_config() -> config_dict.ConfigDict:
               body_linvel = 1.0,
               body_angvel = 1.0,
               # action rate
-              action_rate = -1e-1,
+              action_rate = -1e-3,
               # Termination
               termination=-10.0,
               dof_pos_limits=-1.0,
@@ -243,7 +243,12 @@ class Track(t1_base.T1Env):
     return state
 
   def reset(self, rng: jax.Array) -> mjx_env.State:
+
+    rng, key = jax.random.split(rng)
+    jitter = jax.random.uniform(key, (23,), minval=-0.1, maxval=0.1)
+
     qpos = self._init_q
+    qpos = qpos.at[7:].add(jitter)
     qvel = jp.zeros(self.mjx_model.nv)
 
     # x=+U(-0.5, 0.5), y=+U(-0.5, 0.5), yaw=U(-3.14, 3.14).
