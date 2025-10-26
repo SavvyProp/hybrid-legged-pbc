@@ -1,4 +1,5 @@
 from playground.booster import track
+from playground.booster.track import ppo_params
 from playground.booster.randomize_track import domain_randomize
 from datetime import datetime
 import functools
@@ -6,7 +7,6 @@ import matplotlib.pyplot as plt
 from brax.training.agents.ppo import networks as ppo_networks
 from brax.training.agents.ppo import train as ppo
 from mujoco_playground import wrapper
-from playground.booster.config import ppo_params
 from brax.io import model
 
 def make_trainfn():

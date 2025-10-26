@@ -45,8 +45,9 @@ ppo_params = config_dict.create(
       num_minibatches=32,
       num_updates_per_batch=4,
       discounting=0.97,
+      gae_lambda=0.95,
       learning_rate=3e-4,
-      entropy_cost=0.005,
+      entropy_cost=0.01,
       num_envs=8192,
       batch_size=256,
       clipping_epsilon=0.2,
@@ -60,7 +61,8 @@ ppo_params.network_factory = config_dict.create(
         policy_obs_key="state",
         value_obs_key="privileged_state",
         distribution_type = "normal",
-        noise_std_type = "scalar"
+        noise_std_type = "scalar",
+        state_dependent_std = True
     )
 
 #ppo_params.network_factory = config_dict.create(
