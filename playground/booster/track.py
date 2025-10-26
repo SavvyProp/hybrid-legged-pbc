@@ -51,7 +51,7 @@ def step(
   return jax.lax.scan(single_step, data, (), n_substeps)[0]
 
 ppo_params = config_dict.create(
-      num_timesteps=100_000_000,
+      num_timesteps=60_000_000,
       num_evals=10,
       reward_scaling=1.0,
       episode_length=500,
@@ -76,8 +76,8 @@ ppo_params.network_factory = config_dict.create(
         value_hidden_layer_sizes=(1024, 512, 512, 256, 256),
         policy_obs_key="state",
         value_obs_key="privileged_state",
-        distribution_type = "normal",
-        noise_std_type = "scalar",
+        #distribution_type = "normal",
+        #noise_std_type = "scalar",
         state_dependent_std = True
     )
 
