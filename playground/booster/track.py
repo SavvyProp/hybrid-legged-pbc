@@ -62,7 +62,7 @@ ppo_params = config_dict.create(
       num_updates_per_batch=4,
       discounting=0.97,
       gae_lambda=0.95,
-      learning_rate=3e-4,
+      learning_rate=1e-4,
       entropy_cost=0.001,
       num_envs=8192,
       batch_size=256,
@@ -112,7 +112,7 @@ def default_config() -> config_dict.ConfigDict:
               body_linvel = 1.0,
               body_angvel = 1.0,
               # action rate
-              action_rate = -1e-3,
+              action_rate = -1e-2,
               # Termination
               termination=-10.0,
               dof_pos_limits=-1.0,
