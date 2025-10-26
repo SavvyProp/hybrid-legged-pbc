@@ -84,8 +84,8 @@ viewer = mujoco.viewer.launch_passive(mj_model, data)
 import time
 while True:
     for c1 in range(ppo_param_.episode_length):
-        pipeline_state = pipeline_state_list[c1]
-        state = states[c1]
+        pipeline_state = pipeline_state_list[0]
+        state = states[0]
         print(get_contact_dict(state.data.contact, ids))
         time.sleep(0.02)
         mjx.get_data_into(data, mj_model, pipeline_state)
