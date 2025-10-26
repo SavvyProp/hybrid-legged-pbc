@@ -76,8 +76,8 @@ ppo_params.network_factory = config_dict.create(
         value_hidden_layer_sizes=(1024, 512, 512, 256, 256),
         policy_obs_key="state",
         value_obs_key="privileged_state",
-        #distribution_type = "normal",
-        #noise_std_type = "scalar",
+        distribution_type = "normal",
+        noise_std_type = "scalar",
         state_dependent_std = False
     )
 
