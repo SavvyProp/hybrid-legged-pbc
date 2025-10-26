@@ -147,7 +147,7 @@ def parse_motion(task, num_bodies, num_joints):
   body_vels = jp.array(body_vels)
   qpos = jp.array(qpos)
   qvel = jp.array(qvel)
-
+  init_pose = jp.array(init_pose) 
   return body_poses, body_vels, qpos, qvel, init_pose
   
 
