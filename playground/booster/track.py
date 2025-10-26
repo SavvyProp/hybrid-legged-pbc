@@ -136,7 +136,7 @@ def default_config() -> config_dict.ConfigDict:
   )
 
 def parse_motion(task, num_bodies, num_joints):
-  
+  init_pose = np.genfromtxt(f"motions/{task}_initial_pose.csv", delimiter=",")
   task_array = np.genfromtxt(f"motions/{task}.csv", delimiter=",")
   body_poses = task_array[:, :num_bodies * 7].reshape(-1, num_bodies, 7)
   body_vels = task_array[:, num_bodies * 7: 
@@ -148,7 +148,7 @@ def parse_motion(task, num_bodies, num_joints):
   qpos = jp.array(qpos)
   qvel = jp.array(qvel)
 
-  return body_poses, body_vels, qpos, qvel
+  return body_poses, body_vels, qpos, qvel, init_pose
   
 
 class Track(t1_base.T1Env):
@@ -173,14 +173,13 @@ class Track(t1_base.T1Env):
     return config
 
   def _post_init(self) -> None:
-    self.body_poses, self.body_vels, self.qpos_traj, self.qvel_traj = parse_motion(self.task, 
+    self.body_poses, self.body_vels, self.qpos_traj, self.qvel_traj, self.init_pose = parse_motion(self.task, 
                                                                    self.ids["num_bodies"],
                                                                    self.ids["ctrl_num"])
     self.traj_length = self.qpos_traj.shape[0]
     #self._init_q = jp.array(self._mj_model.keyframe("home").qpos)
     # Take self._init_q from first frame of qpos_traj
-    self._init_q = self.qpos_traj[0, :]
-    self._init_q = self._init_q.at[2].add(0.04)
+    self._init_q = self.init_pose
     
     self._default_pose = jp.array(self._mj_model.keyframe("home").qpos[7:])
 

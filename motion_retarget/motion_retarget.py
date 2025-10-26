@@ -12,6 +12,8 @@ import os
 import jax
 import jax.numpy as jnp
 import mujoco.mjx as mjx
+from motion_retarget.initial_pose import initial_pose
+from models.booster_t1_pgnd.booster_ids import ids
 
 def resample_motion(traj):
     if isinstance(traj, str):
@@ -121,7 +123,10 @@ def resample_motion(traj):
         print(body_poses.shape, body_vels.shape)
     else:
         combined = np.concatenate([qpos_frames, qvel_frames], axis=1)
+
+    initial_pose_ = initial_pose(mj_model, qpos_frames[0], ids=ids)
     np.savetxt('motions/CMU_02_05.csv', combined, delimiter=',')
+    np.savetxt('motions/CMU_02_05_initial_pose.csv', initial_pose_, delimiter=',')
 
     # Visualize at 50 Hz in viewer
     with mujoco.viewer.launch_passive(mj_model, data) as viewer:
