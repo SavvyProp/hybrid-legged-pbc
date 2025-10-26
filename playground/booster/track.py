@@ -250,13 +250,9 @@ class Track(t1_base.T1Env):
     qpos = self._init_q
     qpos = qpos.at[7:].add(jitter)
     qvel = jp.zeros(self.mjx_model.nv)
-
-    # x=+U(-0.5, 0.5), y=+U(-0.5, 0.5), yaw=U(-3.14, 3.14).
-
-    # d(xyzrpy)=U(-0.5, 0.5)
     rng, key = jax.random.split(rng)
     qvel = qvel.at[0:6].set(
-        jax.random.uniform(key, (6,), minval=-0.3, maxval=0.3)
+        jax.random.uniform(key, (6,), minval=-0.2, maxval=0.2)
     )
 
     data = self.make_data(
@@ -271,7 +267,7 @@ class Track(t1_base.T1Env):
     data = mjx.forward(self.mjx_model, data)
 
     force_traj, rng = self.force_traj_gen.sample_force_traj(rng)
-    force_traj["forces"] *= 0.05
+    force_traj["forces"] *= 0.00
     force_lin = jp.zeros(3)
 
     info = {

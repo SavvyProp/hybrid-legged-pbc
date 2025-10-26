@@ -127,15 +127,16 @@ class Track(track):
     }
 
   def reset(self, rng: jax.Array) -> mjx_env.State:
+    
+    rng, key = jax.random.split(rng)
+    jitter = jax.random.uniform(key, (23,), minval=-0.1, maxval=0.1)
+
     qpos = self._init_q
+    qpos = qpos.at[7:].add(jitter)
     qvel = jp.zeros(self.mjx_model.nv)
-
-    # x=+U(-0.5, 0.5), y=+U(-0.5, 0.5), yaw=U(-3.14, 3.14).
-
-    # d(xyzrpy)=U(-0.5, 0.5)
     rng, key = jax.random.split(rng)
     qvel = qvel.at[0:6].set(
-        jax.random.uniform(key, (6,), minval=-0.3, maxval=0.3)
+        jax.random.uniform(key, (6,), minval=-0.2, maxval=0.2)
     )
 
     data = self.make_data(
@@ -252,7 +253,7 @@ class Track(track):
     components = ft_ref.ctrl2components(data, action, self.ids)
     rew["pbc_w"] = self._cost_pbc_w(action, contact)
     rew["maqp_cons"] = self._reward_maqp_cons(data, info, action)
-    rew["vel_def"] = self._reward_des_vel(components)
+    rew["vel_def"] = self._reward_des_vel(info, components)
     rew["vel_action_rate"] = self._cost_vel_action_rate(action, info["last_act"])
     return rew
 
@@ -271,7 +272,7 @@ class Track(track):
                           angvel_last_act))
     return c1 + c2
   
-  def _reward_des_vel(self, components):
+  def _reward_des_vel(self, info, components):
     des_vel_mag = jp.linalg.norm(components["des_com_vel"])
     des_angvel_mag = jp.linalg.norm(components["des_com_angvel"])
     des_vel_cap = 1.5
@@ -284,7 +285,9 @@ class Track(track):
 
     # vel tracking reward
 
-    lin_vel_error = jp.sum(jp.square(lin_vel[:2] - components["des_com_vel"][:2]))
+    des_linvel = self.qvel_traj[info["step"], :3]
+
+    lin_vel_error = jp.sum(jp.square(des_linvel - components["des_com_vel"]))
     linvel_rew = jp.exp(-lin_vel_error / self._config.reward_config.tracking_sigma)
 
     return rew_vel_lim * 0.1 # + linvel_rew
