@@ -32,8 +32,7 @@ def resample_motion(traj):
     orig_dt = 1.0 / fps
     N = root_pos.shape[0]
     t_orig = np.arange(N, dtype=np.float64) * orig_dt
-    target_hz = 50.0
-    target_dt = 1.0 / target_hz
+    target_dt = 0.02
     t_new = np.arange(0.0, t_orig[-1] + 1e-9, target_dt, dtype=np.float64)
 
     # Helpers

@@ -112,9 +112,9 @@ def default_config() -> config_dict.ConfigDict:
               body_linvel = 1.0,
               body_angvel = 1.0,
               # action rate
-              action_rate = -8e-3,
+              action_rate = -2e-2,
               # Termination
-              termination=-500.0,
+              termination=-1000.0,
               dof_pos_limits=-1.0,
           ),
           pos_sigma=0.3,
