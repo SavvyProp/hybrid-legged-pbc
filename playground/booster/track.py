@@ -60,7 +60,7 @@ ppo_params = config_dict.create(
       unroll_length=20,
       num_minibatches=32,
       num_updates_per_batch=4,
-      discounting=0.97,
+      discounting=0.95,
       gae_lambda=0.95,
       learning_rate=2e-4,
       entropy_cost=0.001,
@@ -112,7 +112,7 @@ def default_config() -> config_dict.ConfigDict:
               body_linvel = 1.0,
               body_angvel = 1.0,
               # action rate
-              action_rate = -0.2,
+              action_rate = -0.1,
               # Termination
               termination=-500.0,
               dof_pos_limits=-1.0,

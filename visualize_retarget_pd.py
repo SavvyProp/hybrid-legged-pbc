@@ -55,7 +55,7 @@ saved_params = model.load_params(model_path)
 inference_fn = makeIFN()(saved_params)
 jit_inference_fn = jax.jit(inference_fn)
 
-rng = jax.random.PRNGKey(0)
+rng = jax.random.PRNGKey(1)
 mj_model = mujoco.MjModel.from_xml_path('models/booster_t1_pgnd/scene_mjx_feetonly_flat_terrain.xml')
 data = mujoco.MjData(mj_model)
 init_qpos = mj_model.keyframe('home').qpos
@@ -66,6 +66,7 @@ ctrl_list = []
 obs_list = []
 nn_p_list = []
 states = []
+ctrl_list = []
 
 for c in range(ppo_param_.episode_length):
     act_rng, rng = jax.random.split(rng)
@@ -76,6 +77,7 @@ for c in range(ppo_param_.episode_length):
     ctrl_list += [ctrl]
     states += [state]
     pipeline_state_list += [pipeline_state]
+    print("Ctrl: ", ctrl)
 
 
 print("Rollout precomputed")
@@ -86,7 +88,6 @@ while True:
     for c1 in range(ppo_param_.episode_length):
         pipeline_state = pipeline_state_list[c1]
         state = states[c1]
-        print(state.metrics)
         time.sleep(0.02)
         mjx.get_data_into(data, mj_model, pipeline_state)
         viewer.sync()
