@@ -29,7 +29,7 @@ def domain_randomize(model: mjx.Model, rng: jax.Array):
     # Floor friction: =U(0.4, 1.0).
     rng, key = jax.random.split(rng)
     geom_friction = model.geom_friction.at[FLOOR_GEOM_ID, 0].set(
-        jax.random.uniform(key, minval=0.2, maxval=0.6)
+        jax.random.uniform(key, minval=0.4, maxval=0.5)
     )
 
     rng, key = jax.random.split(rng)
@@ -41,7 +41,7 @@ def domain_randomize(model: mjx.Model, rng: jax.Array):
     # Scale armature: *U(1.0, 1.05).
     rng, key = jax.random.split(rng)
     armature = model.dof_armature[6:] * jax.random.uniform(
-        key, shape=(23,), minval=1.0, maxval=1.05
+        key, shape=(23,), minval=1.0, maxval=1.01
     )
     dof_armature = model.dof_armature.at[6:].set(armature)
 

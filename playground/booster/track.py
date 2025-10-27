@@ -62,7 +62,7 @@ ppo_params = config_dict.create(
       num_updates_per_batch=4,
       discounting=0.97,
       gae_lambda=0.95,
-      learning_rate=3e-4,
+      learning_rate=2e-4,
       entropy_cost=0.001,
       num_envs=8192,
       batch_size=256,
@@ -78,7 +78,7 @@ ppo_params.network_factory = config_dict.create(
         value_obs_key="privileged_state",
         distribution_type = "normal",
         noise_std_type = "scalar",
-        state_dependent_std = True
+        state_dependent_std = False
     )
 
 def default_config() -> config_dict.ConfigDict:
@@ -112,7 +112,7 @@ def default_config() -> config_dict.ConfigDict:
               body_linvel = 1.0,
               body_angvel = 1.0,
               # action rate
-              action_rate = -1e-3,
+              action_rate = -3e-3,
               # Termination
               termination=-10.0,
               dof_pos_limits=-1.0,
@@ -244,14 +244,14 @@ class Track(t1_base.T1Env):
   def reset(self, rng: jax.Array) -> mjx_env.State:
 
     rng, key = jax.random.split(rng)
-    jitter = jax.random.uniform(key, (23,), minval=-0.1, maxval=0.1)
+    jitter = jax.random.uniform(key, (23,), minval=-0.01, maxval=0.01)
 
     qpos = self._init_q
     qpos = qpos.at[7:].add(jitter)
     qvel = jp.zeros(self.mjx_model.nv)
     rng, key = jax.random.split(rng)
     qvel = qvel.at[0:6].set(
-        jax.random.uniform(key, (6,), minval=-0.2, maxval=0.2)
+        jax.random.uniform(key, (6,), minval=-0.1, maxval=0.1)
     )
 
     data = self.make_data(
@@ -266,7 +266,7 @@ class Track(t1_base.T1Env):
     data = mjx.forward(self.mjx_model, data)
 
     force_traj, rng = self.force_traj_gen.sample_force_traj(rng)
-    force_traj["forces"] *= 0.00
+    force_traj["forces"] *= 0.05
     force_lin = jp.zeros(3)
 
     info = {
