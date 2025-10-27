@@ -77,7 +77,6 @@ def domain_randomize(model: mjx.Model, rng: jax.Array):
         dof_frictionloss,
         dof_armature,
         body_mass,
-        dof_damping,
     )
 
   (
@@ -85,7 +84,6 @@ def domain_randomize(model: mjx.Model, rng: jax.Array):
       frictionloss,
       armature,
       body_mass,
-      dof_damping,
   ) = rand_dynamics(rng)
 
   in_axes = jax.tree_util.tree_map(lambda x: None, model)
@@ -94,7 +92,6 @@ def domain_randomize(model: mjx.Model, rng: jax.Array):
       "dof_frictionloss": 0,
       "dof_armature": 0,
       "body_mass": 0,
-      "dof_damping": 0,
   })
 
   model = model.tree_replace({
@@ -102,7 +99,6 @@ def domain_randomize(model: mjx.Model, rng: jax.Array):
       "dof_frictionloss": frictionloss,
       "dof_armature": armature,
       "body_mass": body_mass,
-      "dof_damping": dof_damping,
   })
 
   return model, in_axes

@@ -51,7 +51,7 @@ def step(
   return jax.lax.scan(single_step, data, (), n_substeps)[0]
 
 ppo_params = config_dict.create(
-      num_timesteps=35_000_000,
+      num_timesteps=30_000_000,
       num_evals=10,
       reward_scaling=1.0,
       episode_length=500,
@@ -114,7 +114,7 @@ def default_config() -> config_dict.ConfigDict:
               # action rate
               action_rate = -8e-3,
               # Termination
-              termination=-100.0,
+              termination=-500.0,
               dof_pos_limits=-1.0,
           ),
           pos_sigma=0.3,
