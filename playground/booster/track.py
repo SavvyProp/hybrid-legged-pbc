@@ -51,7 +51,7 @@ def step(
   return jax.lax.scan(single_step, data, (), n_substeps)[0]
 
 ppo_params = config_dict.create(
-      num_timesteps=30_000_000,
+      num_timesteps=35_000_000,
       num_evals=10,
       reward_scaling=1.0,
       episode_length=500,
@@ -112,9 +112,9 @@ def default_config() -> config_dict.ConfigDict:
               body_linvel = 1.0,
               body_angvel = 1.0,
               # action rate
-              action_rate = -3e-3,
+              action_rate = -8e-3,
               # Termination
-              termination=-10.0,
+              termination=-100.0,
               dof_pos_limits=-1.0,
           ),
           pos_sigma=0.3,
@@ -328,7 +328,7 @@ class Track(t1_base.T1Env):
     #}
 
     obs = self._get_obs(data, state.info)
-    done = self._get_termination(data, contacts)
+    done = self._get_termination(state.info, data, contacts)
 
     body_poses = motion_retarget.body_poses_in_base_mjx(self._mjx_model,
                                                         data,
@@ -478,10 +478,10 @@ class Track(t1_base.T1Env):
         "dof_pos_limits": self._cost_joint_pos_limits(data.qpos[7:]),
     }
   
-  def _get_termination(self, data, contacts) -> jax.Array:
-    current_base_pos = data.qpos[:3]
-    ref_base_pos = self.qpos_traj[0, :3]
-    dist = jp.linalg.norm(current_base_pos - ref_base_pos)
+  def _get_termination(self, info, data, contacts) -> jax.Array:
+    current_base_pos = data.qpos[2]
+    ref_base_pos = self.qpos_traj[info["step"], 2]
+    dist = jp.abs(current_base_pos - ref_base_pos)
     out_of_bounds = dist > 0.3
     contact_termination = contacts["trunk"] | contacts["head"]
     return (
