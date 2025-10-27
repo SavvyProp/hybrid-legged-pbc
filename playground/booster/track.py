@@ -54,7 +54,7 @@ ppo_params = config_dict.create(
       num_timesteps=30_000_000,
       num_evals=10,
       reward_scaling=1.0,
-      episode_length=500,
+      episode_length=770,
       normalize_observations=True,
       action_repeat=1,
       unroll_length=20,
@@ -84,8 +84,8 @@ ppo_params.network_factory = config_dict.create(
 def default_config() -> config_dict.ConfigDict:
   return config_dict.create(
       ctrl_dt=0.02,
-      sim_dt=0.001,
-      episode_length=1000,
+      sim_dt=0.002,
+      episode_length=770,
       action_repeat=1,
       action_scale=1.0,
       history_len=1,
@@ -112,9 +112,9 @@ def default_config() -> config_dict.ConfigDict:
               body_linvel = 1.0,
               body_angvel = 1.0,
               # action rate
-              action_rate = -2e-2,
+              action_rate = -0.1,
               # Termination
-              termination=-1000.0,
+              termination=-500.0,
               dof_pos_limits=-1.0,
           ),
           pos_sigma=0.3,
