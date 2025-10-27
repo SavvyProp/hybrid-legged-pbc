@@ -541,7 +541,7 @@ class Track(t1_base.T1Env):
       self, act: jax.Array, last_act: jax.Array, last_last_act: jax.Array
   ) -> jax.Array:
     del last_last_act  # Unused.
-    c1 = jp.sum(jp.square(act - last_act))
+    c1 = jp.sum(jp.square(jp.tanh(act) - jp.tanh(last_act)))
     return c1
   
   def _cost_termination(self, done: jax.Array) -> jax.Array:
