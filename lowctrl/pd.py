@@ -17,8 +17,8 @@ def logit2limit(logit, ids, traj_center = None):
     #des_pos = center + scaling * jnp.tanh(logit)
     #return des_pos
     if traj_center is not None:
-        des_pos = traj_center + 1.0 * jnp.tanh(logit)#1.0 * jnp.tanh(logit)
-        #des_pos = center + scaling * jnp.tanh(logit / scaling)
+        #des_pos = traj_center + 1.0 * jnp.tanh(logit)#1.0 * jnp.tanh(logit)
+        des_pos = center + scaling * jnp.tanh(logit / scaling)
     else:
         des_pos = center + scaling * jnp.tanh(logit / scaling)
         #des_pos = center + 1.0 * logit#1.0 * jnp.tanh(logit)
